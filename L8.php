@@ -60,42 +60,42 @@ class L8
 
     public static function debug($message, array $context=[])
     {
-        return static::log(static::DEBUG, $message, $context);
+        static::log(static::DEBUG, $message, $context);
     }
 
     public static function info($message, array $context=[])
     {
-        return static::log(static::INFO, $message, $context);
+        static::log(static::INFO, $message, $context);
     }
 
     public static function notice($message, array $context=[])
     {
-        return static::log(static::NOTICE, $message, $context);
+        static::log(static::NOTICE, $message, $context);
     }
 
     public static function warning($message, array $context=[])
     {
-        return static::log(static::WARNING, $message, $context);
+        static::log(static::WARNING, $message, $context);
     }
 
     public static function error($message, array $context=[])
     {
-        return static::log(static::ERROR, $message, $context);
+        static::log(static::ERROR, $message, $context);
     }
 
     public static function critical($message, array $context=[])
     {
-        return static::log(static::CRITICAL, $message, $context);
+        static::log(static::CRITICAL, $message, $context);
     }
 
     public static function alert($message, array $context=[])
     {
-        return static::log(static::ALERT, $message, $context);
+        static::log(static::ALERT, $message, $context);
     }
 
     public static function emergency($message, array $context=[])
     {
-        return static::log(static::EMERGENCY, $message, $context);
+        static::log(static::EMERGENCY, $message, $context);
     }
 
     /* -- */
@@ -144,15 +144,14 @@ class L8
                               ? $map[$errno]
                               : ['E_UNKOWN(' . $errno . ')', static::ERROR];
 
-        return static::write($level, static::ERROR_HANDLER, $prefix . ':' .
-                             $message, $file, $line, $context);
+        static::write($level, static::ERROR_HANDLER, $prefix . ':' . $message,
+                      $file, $line, $context);
     }
 
     public static function exception_handler($e)
     {
-        return static::write(static::ERROR, static::EXCEPTION_HANDLER,
-                             $e->getMessage(),
-                             $e->getFile(), $e->getLine(), []);
+        static::write(static::ERROR, static::EXCEPTION_HANDLER,
+                      $e->getMessage(), $e->getFile(), $e->getLine(), []);
     }
 
     /* -- */
