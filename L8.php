@@ -50,7 +50,7 @@ class L8
     // data source
     const LOG_STATEMENT     = 1;
     const ERROR_HANDLER     = 2;
-    const EXCEPTION_HANDLER = 3;
+    const EXCEPTION_HANDLER = 4;
 
     // internals
     private static $socket;
