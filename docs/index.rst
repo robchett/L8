@@ -1,5 +1,5 @@
-Welcome to the L8 documentation
-===============================
+L8
+==
 
 L8 is an ultra-lightweight PHP based logging system which publishes data directly to a Redis channel.
 
@@ -16,7 +16,7 @@ You can get L8 by grabbing the git repository:
 Compatability with PHP
 ======================
 
-L8 was written using PHP 5.4.29, however if may be usable on earlier versions with little or no modification.
+L8 was written using PHP 5.4.29, however it may be usable on earlier versions with little or no modification. The Redis API is self-contained 
 
 Contents
 ========
@@ -26,6 +26,7 @@ Contents
 
    getting_started
    api_reference
+   examples
 
 Indices and tables
 ==================

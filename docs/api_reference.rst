@@ -21,8 +21,8 @@ Example
 
 .. code-block:: php
 
-    <?php
-    // Setup the L8 environment
+   <?php
+   // Setup the L8 environment
     L8::$server = 'db1.example.com:6333';
     L8::db = 0;
     L8::channel = 'L8test';
@@ -95,14 +95,15 @@ Logging Methods
 | emergency | void emergency($message, array $context=[]) |
 +-----------+---------------------------------------------+
 
-Example:
+Example
+^^^^^^^
 
 .. code-block:: php
 
-	<?php
+   <?php
 
-	// Generate a simple notice
-	L8::notice('Simple notice');
+   // Generate a simple notice
+   L8::notice('Simple notice');
 
 Error Handling
 --------------
@@ -111,13 +112,13 @@ L8 can be setup as an error handler as follows:
 
 .. code-block:: php
 
-	<?php
+   <?php
 
-	// Setup L8 as an error handler
-	set_error_handler(['L8', 'error_handler']);
+   // Setup L8 as an error handler
+   set_error_handler(['L8', 'error_handler']);
 
-	// And trigger a simple error
-	$a = 1 / 0;
+   // And trigger a simple error
+   $a = 1 / 0;
 
 Exception Handling
 ------------------
@@ -126,10 +127,10 @@ L8 can also be used to handle exceptions as follows:
 
 .. code-block:: php
 
-	<?php
+   <?php
 
-	// Setup L8 as an exception handler
-	set_exception_handler(['L8', 'exception_handler']);
+   // Setup L8 as an exception handler
+   set_exception_handler(['L8', 'exception_handler']);
 
-	// And trigger a simple exception
-	throw new LogicException('Unexpected logic condition');
+   // And trigger a simple exception
+   throw new LogicException('Unexpected logic condition');
