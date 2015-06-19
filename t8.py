@@ -81,6 +81,7 @@ class T8:
         self.domain_index = 0
         self.error_index = 0
         self.context_index = 0
+        self.options_index = 0
 
         self.error_mode = data.mode.totals
 
@@ -106,7 +107,8 @@ class T8:
         self.clear()
         domains = self.data.domains()
         self.domain_max = len(domains)
-        self.screen1.addstr('{0: <{width}}'.format('Domains ({} of {}) {} {}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS), curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
+        self.screen1.addstr('{0: <{width}}'.format('Domains ({} of {}) {} {}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS),
+                            curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
         cnt = 0
         self.current_domain = None
         if self.domain_max:
@@ -114,11 +116,10 @@ class T8:
                 if self.domain_index == cnt:
                     self.current_domain = i
                 if self.should_skip(self.domain_index, cnt, self.window_height):
-                    self.screen1.addstr('{0: <{width1}}{1: >{width2}}'.format(i.host, i.error_count, width1=curses.COLS - 10, width2=10), curses.color_pair(2 if  self.domain_index == cnt else 0))
+                    self.screen1.addstr('{0: <{width1}}{1: >{width2}}'.format(i.host, i.error_count, width1=curses.COLS - 10, width2=10), curses.color_pair(2 if self.domain_index == cnt else 0))
                 cnt += 1
             self.error_list()
         self.refresh()
-
 
     def should_skip(self, index, cnt, height):
         skip_cnt = (index - height + 4) if index + 4 > height else 0
@@ -135,7 +136,9 @@ class T8:
                 if self.error_index == cnt:
                     self.current_error = i
                 if self.should_skip(self.error_index, cnt, self.window_height):
-                    self.screen2.addstr('{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(i.file[-30:], i.line, i.message.replace("\n", "|")[-79:], i.level, i.count, i.time, width1=30, width2=5, width3=80, width4=10, width5=5, width6=10), curses.color_pair(2 if  self.error_index == cnt else 0))
+                    self.screen2.addstr(
+                        '{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(i.file[-30:], i.line, i.message.replace("\n", "|")[-79:], i.level, i.count, i.time, width1=30, width2=5, width3=80,
+                                                                                                                         width4=10, width5=5, width6=10), curses.color_pair(2 if self.error_index == cnt else 0))
                 cnt += 1
 
             self.error_context()
@@ -159,7 +162,63 @@ class T8:
         else:
             self.screen3.addstr('{0: <{width}}'.format('No error', width=curses.COLS), curses.color_pair(3))
 
+    def get_help_screen(self):
+        self.clear()
+        self.screen1.addstr('\
+Key commands\n\
+    tab : move between windows \n\
+    up  : Move through the current window\n\
+    down: Move through the current window\n\
+    h   : View this screen\n\
+    q   : Quit or close a sub screen\n\
+    o   : Open the options screen'
+                            )
 
+        self.refresh()
+
+        while True:
+            c = self.stdscr.getch()
+            if c == ord('q'):
+                self.options_index = 0
+                return
+
+    def get_options_screen(self):
+        while True:
+            self.clear()
+            cnt = 0
+            self.screen1.addstr('Options\n')
+            self.screen1.addstr('Dates\n')
+            self.screen1.addstr('\tStart date: {}\n'.format(self.data.format_time(self.data.start_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            cnt += 1
+            self.screen1.addstr('\tEnd date  : {}\n'.format(self.data.format_time(self.data.end_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            cnt += 1
+            self.screen1.addstr('\n')
+            self.screen1.addstr('Error levels\n')
+
+            for i in self.data.levels.keys:
+                self.screen1.addstr('\t[{}] {}\n'.format('x' if self.data.error_levels[cnt - 2] else ' ', i), curses.color_pair(2 if self.options_index == cnt else 0))
+                cnt += 1
+
+            self.refresh()
+            c = self.stdscr.getch()
+            if c == ord('q'):
+                return
+            elif c == curses.KEY_UP:
+                self.options_index = max(self.options_index - 1, 0)
+            elif c == curses.KEY_DOWN:
+                self.options_index = min(self.options_index + 1, cnt - 1)
+            elif c == ord(' '):
+                self.data.error_levels[self.options_index - 2] = self.data.error_levels[self.options_index - 2] = not self.data.error_levels[self.options_index - 2]
+            elif c == curses.KEY_LEFT:
+                if self.options_index == 0:
+                    self.data.start_time -= 24 * 60 * 60
+                elif self.options_index == 1:
+                    self.data.end_time -= 24 * 60 * 60
+            elif c == curses.KEY_RIGHT:
+                if self.options_index == 0:
+                    self.data.start_time += 24 * 60 * 60
+                elif self.options_index == 1:
+                    self.data.end_time += 24 * 60 * 60
 
     def refresh(self):
         self.screen1.noutrefresh()
@@ -191,6 +250,7 @@ class T8:
         self.window_width = curses.COLS
 
         # Create a sub window at half height
+        self.stdscr = stdscr
         self.screen1 = curses.newwin(self.window_height, self.window_width, 0, 0)
         self.screen2 = curses.newwin(self.window_height, self.window_width, self.window_height, 0)
         self.screen3 = curses.newwin(self.window_height, self.window_width, self.window_height * 2, 0)
@@ -199,7 +259,7 @@ class T8:
         self.refresh()
 
         while True:
-            c = stdscr.getch()
+            c = self.stdscr.getch()
             if c == curses.KEY_UP:
                 if self.current_screen == self.screens.DOMAINS:
                     self.domain_index = max(self.domain_index - 1, 0)
@@ -211,7 +271,7 @@ class T8:
                 elif self.current_screen == self.screens.CONTEXT:
                     self.context_index = max(self.context_index - 1, 0)
                 self.domain_list()
-            if c == curses.KEY_DOWN:
+            elif c == curses.KEY_DOWN:
                 if self.current_screen == self.screens.DOMAINS:
                     self.domain_index = min(self.domain_index + 1, self.domain_max - 1)
                     self.error_index = 0
@@ -222,37 +282,19 @@ class T8:
                 elif self.current_screen == self.screens.CONTEXT:
                     self.context_index = min(self.context_index + 1, self.context_max - 1)
                 self.domain_list()
-            if c == ord('a'):
+            elif c == ord('a'):
                 self.error_mode = data.mode.totals if self.error_mode == data.mode.latest else data.mode.latest
                 self.domain_list()
-            if c == ord('\t'):
+            elif c == ord('\t'):
                 self.current_screen = (self.current_screen + 1) if self.current_screen != self.screens.CONTEXT else self.screens.DOMAINS
                 self.domain_list()
-            if c == ord('1'):
-                self.data.start_time -= 24*60*60
+            elif c == ord('h'):
+                self.get_help_screen()
                 self.domain_list()
-            if c == ord('2'):
-                self.data.start_time += 24*60*60
+            elif c == ord('o'):
+                self.get_options_screen()
                 self.domain_list()
-            if c == ord('3'):
-                self.data.end_time -= 24*60*60
-                self.domain_list()
-            if c == ord('4'):
-                self.data.end_time += 24*60*60
-                self.domain_list()
-            if c == ord('5'):
-                self.data.level_min = max(0, self.data.level_min - 1)
-                self.domain_list()
-            if c == ord('6'):
-                self.data.level_min = min(self.data.levels.EMERGENCY, self.data.level_min + 1)
-                self.domain_list()
-            if c == ord('7'):
-                self.data.level_max = max(0, self.data.level_max - 1)
-                self.domain_list()
-            if c == ord('8'):
-                self.data.level_max = min(self.data.levels.EMERGENCY, self.data.level_max + 1)
-                self.domain_list()
-            if c == ord('q'):
+            elif c == ord('q'):
                 return True
 
 

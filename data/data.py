@@ -63,8 +63,16 @@ class Data:
     def __init__(self, args):
         self.start_time = time.time() - (7 * 24 * 60 * 60)
         self.end_time = time.time() + (24 * 60 * 60)
-        self.level_min = self.levels.DEBUG
-        self.level_max = self.levels.EMERGENCY
+        self.error_levels = {
+            self.levels.DEBUG: 1,
+            self.levels.INFO: 1,
+            self.levels.NOTICE: 1,
+            self.levels.WARNING: 1,
+            self.levels.ERROR: 1,
+            self.levels.CRITICAL: 1,
+            self.levels.ALERT: 1,
+            self.levels.EMERGENCY: 1,
+        }
         try:
             self.mysql = _mysql.connect(args.host, args.username, args.password, args.database)
         except (_mysql_exceptions.OperationalError, _mysql_exceptions.ProgrammingError) as err:
@@ -72,11 +80,14 @@ class Data:
             sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
             sys.exit()
 
+    def format_time(self, ts):
+        return time.strftime("%Y-%m-%d", time.gmtime(ts))
+
     def get_time_sql(self):
-        return 'time >= "{}" AND time <= "{}"'.format(time.strftime("%Y-%m-%d", time.gmtime(self.start_time)), time.strftime("%Y-%m-%d", time.gmtime(self.end_time)))
+        return 'DATE(time) >= "{}" AND DATE(time) <= "{}"'.format(self.format_time(self.start_time), self.format_time(self.end_time))
 
     def get_level_sql(self):
-        return 'level IN ("{}")'.format('","'.join(self.levels.keys[self.level_min:(self.level_max + 1)]))
+        return 'level IN ("{}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
 
 
     def domains(self):
