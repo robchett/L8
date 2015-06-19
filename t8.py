@@ -252,6 +252,8 @@ class T8:
             if c == ord('8'):
                 self.data.level_max = min(self.data.levels.EMERGENCY, self.data.level_max + 1)
                 self.domain_list()
+            if c == ord('q'):
+                return True
 
 
 if __name__ == "__main__":
