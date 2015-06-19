@@ -58,8 +58,8 @@ class L8 {
     const EXCEPTION_HANDLER = 3;
 
     // internals
-    private static $socket;
-    private static $domain;
+    protected static $socket;
+    protected static $domain;
 
     /* -- */
 
@@ -97,7 +97,7 @@ class L8 {
 
     /* -- */
 
-    private static function log($level, $message, array $context = array()) {
+    protected static function log($level, $message, array $context = array()) {
         if (count($trace = debug_backtrace(false, 2)) > 1) {
             $file = $trace[1]['file'];
             $line = $trace[1]['line'];
@@ -152,7 +152,7 @@ class L8 {
 
     /* -- */
 
-    private static function write($level, $source, $message, $file, $line,
+    protected static function write($level, $source, $message, $file, $line,
                                   $context) {
         // connect to redis server
         if (!isset(static::$socket)) {
@@ -200,25 +200,25 @@ class L8 {
 
     /* -- */
 
-    private static function incr($key) {
+    protected static function incr($key) {
         return static::execute(array('INCR', $key));
     }
 
-    private static function publish($channel, $message) {
+    protected static function publish($channel, $message) {
         return static::execute(array('PUBLISH', $channel, $message));
     }
 
-    private static function select($index) {
+    protected static function select($index) {
         return static::execute(array('SELECT', $index));
     }
 
-    private static function set($key, $value) {
+    protected static function set($key, $value) {
         return static::execute(array('SET', $key, $value));
     }
 
     /* -- */
 
-    private static function execute($args) {
+    protected static function execute($args) {
         $cmd = '*' . count($args) . "\r\n";
         foreach ($args as $arg) {
             $cmd .= '$' . strlen($arg) . "\r\n" . $arg . "\r\n";
@@ -229,7 +229,7 @@ class L8 {
         return static::parseResponse();
     }
 
-    private static function parseResponse() {
+    protected static function parseResponse() {
         $line = fgets(static::$socket);
 
         list($type, $result) = array(
