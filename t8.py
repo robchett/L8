@@ -50,14 +50,13 @@ import ConfigParser
 
 from data.data import Data
 
-
 config = ConfigParser.ConfigParser({
-        'database': 'S8',
-        'password': 'S8',
-        'username': 'S8',
-        'host'    : 'localhost',
-        'port'    : '3306',
-        })
+    'database': 'S8',
+    'password': 'S8',
+    'username': 'S8',
+    'host': 'localhost',
+    'port': '3306',
+})
 
 conf_path = os.path.expanduser('~') + '/.t8'
 
@@ -67,11 +66,11 @@ else:
     config.add_section('config')
 
 parser = argparse.ArgumentParser(description='Terminal viewer for L8 redis-backed logger.')
-parser.add_argument('-d', '--database', default=config.get('config','database'))
-parser.add_argument('-p', '--password', default=config.get('config','password'))
-parser.add_argument('-u', '--username', default=config.get('config','username'))
-parser.add_argument('--host', default=config.get('config','host'))
-parser.add_argument('--port', default=config.get('config','port'))
+parser.add_argument('-d', '--database', default=config.get('config', 'database'))
+parser.add_argument('-p', '--password', default=config.get('config', 'password'))
+parser.add_argument('-u', '--username', default=config.get('config', 'username'))
+parser.add_argument('--host', default=config.get('config', 'host'))
+parser.add_argument('--port', default=config.get('config', 'port'))
 parser.add_argument('-s', '--startDate')
 parser.add_argument('-e', '--endDate')
 parser.add_argument('--domain')
@@ -82,6 +81,7 @@ args = parser.parse_args()
 
 if args.method in ['domain']:
     parser.error('A domain is required')
+
 
 class T8:
     class screens:
@@ -125,8 +125,7 @@ class T8:
         self.clear()
         domains = self.data.domains()
         self.domain_max = len(domains)
-        self.screen1.addstr('{0: <{width}}'.format('Domains ({} of {}) {} {}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS),
-                            curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
+        self.screen1.addstr('{0: <{width}}'.format('Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS), curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
         cnt = 0
         self.current_domain = None
         if self.domain_max:
@@ -144,7 +143,7 @@ class T8:
         return cnt >= skip_cnt and (cnt - skip_cnt) < height - 2
 
     def error_list(self):
-        self.screen2.addstr('{0: <{width}}'.format('Errors ({} of {})'.format(self.error_index + 1, self.error_max), width=curses.COLS), curses.color_pair(1 if self.screens.ERRORS != self.current_screen else 3))
+        self.screen2.addstr('{0: <{width}}'.format('Errors ({0} of {1})'.format(self.error_index + 1, self.error_max), width=curses.COLS), curses.color_pair(1 if self.screens.ERRORS != self.current_screen else 3))
         if self.current_domain:
             errors = self.data.errors(self.current_domain.host, self.error_mode)
             self.error_max = len(errors)
@@ -167,15 +166,15 @@ class T8:
         if self.current_error:
             text = json.dumps(json.loads(base64.b64decode(self.current_error.context)), indent=4).split('\n')
             self.context_max = len(text)
-            self.screen3.addstr('{0: <{width}}'.format('Error Context ({} of {})'.format(self.context_index, self.context_max), width=curses.COLS), curses.color_pair(1 if self.screens.CONTEXT != self.current_screen else 3))
+            self.screen3.addstr('{0: <{width}}'.format('Error Context ({0} of {1})'.format(self.context_index, self.context_max), width=curses.COLS), curses.color_pair(1 if self.screens.CONTEXT != self.current_screen else 3))
             cnt = 0
             for i in self.current_error.message.split('\n'):
-                self.screen3.addstr('{0: <{width}}'.format('{}'.format(i), width=curses.COLS), curses.color_pair(4))
+                self.screen3.addstr('{0: <{width}}'.format('{0}'.format(i), width=curses.COLS), curses.color_pair(4))
                 cnt += max(math.ceil(len(self.current_error.message) / self.window_width), 1)
             total = self.window_height - cnt
             for i in text:
                 if self.should_skip(self.context_index + total - 4, cnt, total):
-                    self.screen3.addstr('{}\n'.format(i))
+                    self.screen3.addstr('{0}\n'.format(i))
                 cnt += max(math.ceil(len(i) / self.window_width), 1)
         else:
             self.screen3.addstr('{0: <{width}}'.format('No error', width=curses.COLS), curses.color_pair(3))
@@ -206,15 +205,15 @@ Key commands\n\
             cnt = 0
             self.screen1.addstr('Options\n')
             self.screen1.addstr('Dates\n')
-            self.screen1.addstr('\tStart date: {}\n'.format(self.data.format_time(self.data.start_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            self.screen1.addstr('\tStart date: {0}\n'.format(self.data.format_time(self.data.start_time)), curses.color_pair(2 if self.options_index == cnt else 0))
             cnt += 1
-            self.screen1.addstr('\tEnd date  : {}\n'.format(self.data.format_time(self.data.end_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            self.screen1.addstr('\tEnd date  : {0}\n'.format(self.data.format_time(self.data.end_time)), curses.color_pair(2 if self.options_index == cnt else 0))
             cnt += 1
             self.screen1.addstr('\n')
             self.screen1.addstr('Error levels\n')
 
             for i in self.data.levels.keys:
-                self.screen1.addstr('\t[{}] {}\n'.format('x' if self.data.error_levels[cnt - 2] else ' ', i), curses.color_pair(2 if self.options_index == cnt else 0))
+                self.screen1.addstr('\t[{0}] {1}\n'.format('x' if self.data.error_levels[cnt - 2] else ' ', i), curses.color_pair(2 if self.options_index == cnt else 0))
                 cnt += 1
 
             self.refresh()

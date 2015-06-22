@@ -46,6 +46,7 @@ import time
 import re
 import base64
 import argparse
+from bcolors import bcolors
 
 class Data:
     
@@ -84,14 +85,15 @@ class Data:
         return time.strftime("%Y-%m-%d", time.gmtime(ts))
 
     def get_time_sql(self):
-        return 'DATE(time) >= "{}" AND DATE(time) <= "{}"'.format(self.format_time(self.start_time), self.format_time(self.end_time))
+        return 'DATE(time) >= "{0}" AND DATE(time) <= "{1}"'.format(self.format_time(self.start_time), self.format_time(self.end_time))
 
     def get_level_sql(self):
-        return 'level IN ("{}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
+        return 'level IN ("{0}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
 
 
     def domains(self):
-        self.mysql.query('SELECT domain, count(*) as count FROM `messages` WHERE {} AND {} GROUP BY domain ORDER BY count DESC'.format(self.get_time_sql(), self.get_level_sql()))
+        self.mysql.query('SELECT domain, count(*) as count FROM `messages` WHERE {0} AND {1} GROUP BY domain ORDER BY count DESC'.format(self.get_time_sql(), 
+        self.get_level_sql()))
         result = self.mysql.use_result()
         res = []
         while True:
@@ -103,9 +105,9 @@ class Data:
 
     def errors(self, host, mode):
         if mode == self.mode.totals:
-            self.mysql.query('SELECT filename, line, message, level, source, context, count(*) as count, time FROM `messages` WHERE domain = "{}" AND {} AND {} GROUP BY filename, line ORDER BY count DESC'.format(host, self.get_time_sql(), self.get_level_sql()))
+            self.mysql.query('SELECT filename, line, message, level, source, context, count(*) as count, time FROM `messages` WHERE domain = "{0}" AND {1} AND {2} GROUP BY filename, line ORDER BY count DESC'.format(host, self.get_time_sql(), self.get_level_sql()))
         else:
-            self.mysql.query('SELECT filename, line, message, level, source, context, 1 as count, time FROM `messages` WHERE domain = "{}" AND {} AND {} ORDER BY time DESC'.format(host, self.get_time_sql(), self.get_level_sql()))
+            self.mysql.query('SELECT filename, line, message, level, source, context, 1 as count, time FROM `messages` WHERE domain = "{0}" AND {1} AND {2} ORDER BY time DESC'.format(host, self.get_time_sql(), self.get_level_sql()))
         result = self.mysql.use_result()
         res = []
         while True:
@@ -149,8 +151,7 @@ class Data:
 
 
         elif args.method == 'totals':
-            mysql.query(
-                'SELECT filename, line, message, level, source, context, count(*) as count FROM `messages` WHERE ' + date_sql + ' AND domain = "' + args.domain + '" GROUP BY filename, line ORDER BY count DESC')
+            mysql.query('SELECT filename, line, message, level, source, context, count(*) as count FROM `messages` WHERE ' + date_sql + ' AND domain = "' + args.domain + '" GROUP BY filename, line ORDER BY count DESC')
             result = mysql.use_result()
             sys.stdout.write('%s %-50s %-50s %-10s %-10s %-10s %-10s %s\n' % (
                 bcolors.UNDERLINE, ' ', ' ', '', '', '', '', bcolors.ENDC))

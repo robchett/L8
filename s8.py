@@ -124,11 +124,8 @@ CREATE TABLE `messages` (\n\
     def work(self, item):
         try:
             record = json.loads(item['data'])
-            sys.stdout.write("Message received\n")
             if not self.watching(record['domain']):
                 return
-
-            sys.stdout.write("Message accepted\n")
 
             self.mysql.query("INSERT into messages ( `domain` ,  `time` ,  `level` ,  `source` , `message` , `filename` , `line` , `context` ) VALUES ('%s', '%s', %d, '%s', '%s', '%s', '%s', '%s')" % (
                 record['domain'], time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
@@ -137,7 +134,7 @@ CREATE TABLE `messages` (\n\
                 record['filename'], record['line'], record['context']))
 
         except (_mysql.ProgrammingError, _mysql.OperationalError) as err:
-            if  err.errno == 2006:
+            if  err.args[0] == 2006:
                 self.connect()
                 self.work(item)
             else:
