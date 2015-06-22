@@ -39,196 +39,18 @@ import json
 import math
 import redis
 import sys
+import threading
+import _mysql
+import _mysql_exceptions
 import time
 import re
 import base64
 import argparse
-from bcolors import bcolors
-import pymysql as mysql
-import pymysql.err as mysql_exceptions
 
-mysql.install_as_MySQLdb()
-
+from .bcolors import bcolors
 
 class Data:
-    def __init__(self, args):
-        self.start_time = time.time() - (7 * 24 * 60 * 60)
-        self.end_time = time.time() + (24 * 60 * 60)
-        self.error_levels = {
-            self.levels.DEBUG: args.eDEBUG,
-            self.levels.INFO: args.eINFO,
-            self.levels.NOTICE: args.eNOTICE,
-            self.levels.WARNING: args.eWARNING,
-            self.levels.ERROR: args.eERROR,
-            self.levels.CRITICAL: args.eCRITICAL,
-            self.levels.ALERT: args.eALERT,
-            self.levels.EMERGENCY: args.eEMERGENCY,
-        }
-        try:
-            self.mysql = mysql.connect(args.host, args.username, args.password, args.database)
-        except (mysql_exceptions.OperationalError, mysql_exceptions.ProgrammingError) as err:
-            raise ConnectionError(err)
-
-    @staticmethod
-    def format_timestamp(ts):
-        return time.strftime('%Y-%m-%d', time.gmtime(ts))
-
-    @staticmethod
-    def format_datetime(ts):
-        return ts.strftime("%Y-%m-%d")
-
-    def get_time_sql(self):
-        return 'DATE(time) BETWEEN "{0}" AND "{1}"'.format(self.format_timestamp(self.start_time), self.format_timestamp(self.end_time))
-
-    def get_level_sql(self):
-        return 'level IN ("{0}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
-
-    def domains(self):
-        with self.mysql.cursor() as cursor:
-            cursor.execute('SELECT domain, count(*) as count FROM `messages` WHERE {0} AND {1} GROUP BY domain ORDER BY count DESC'.format(
-                self.get_time_sql(),
-                self.get_level_sql())
-            )
-            res = []
-            while True:
-                record = cursor.fetchone()
-                if not record:
-                    break
-                res.append(self.Domain(record[0], record[1]))
-            return res
-
-    def errors(self, host, mode):
-        with self.mysql.cursor() as cursor:
-            if mode == self.mode.totals:
-                cursor.execute('SELECT filename, line, message, level, source, context, count(*) as count, time, id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} GROUP BY filename, line ORDER BY count DESC'.format(
-                    host,
-                    self.get_time_sql(),
-                    self.get_level_sql())
-                )
-            else:
-                cursor.execute('SELECT filename, line, message, level, source, context, 1 as count, time, id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} ORDER BY time DESC'.format(
-                    host,
-                    self.get_time_sql(),
-                    self.get_level_sql())
-                )
-            res = []
-            while True:
-                record = cursor.fetchone()
-                if not record:
-                    break
-                res.append(self.Error(record[8], record[0], record[1], record[2], record[3], record[4], record[5], record[6], record[7], record[9]))
-            return res
-
-    def delete_type(self, error):
-        with self.mysql.cursor() as cursor:
-            sql = "DELETE FROM messages WHERE line = %s AND filename = %s AND domain = %s"
-            parameters = (
-                error.line,
-                error.file,
-                error.domain
-            )
-            cursor.execute(sql, parameters)
-            self.mysql.commit()
-
-    def delete_entry(self, error):
-        with self.mysql.cursor() as cursor:
-            cursor.execute("DELETE FROM messages WHERE id = %s", error.id)
-            self.mysql.commit()
-
-    @staticmethod
-    def invalid_connection(err, args):
-        sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
-        sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
-        sys.stdout.write('%sCREATE DATABASE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
-	sys.stdout.write('%sUSE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
-        sys.stdout.write('%s\
-CREATE TABLE `messages` (\n\
-  `id` int(11) NOT NULL AUTO_INCREMENT,\n\
-  `domain` varchar(255) DEFAULT NULL,\n\
-  `time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n\
-  `level` enum("DEBUG","INFO","NOTICE","WARNING","ERROR","CRITICAL","ALERT","EMERGENCY") DEFAULT NULL,\n\
-  `source` enum("STATEMENT","ERROR","EXCEPTION") DEFAULT NULL,\n\
-  `message` text,\n\
-  `filename` varchar(255) DEFAULT NULL,\n\
-  `line` int(10) DEFAULT NULL,\n\
-  `context` text,\n\
-  PRIMARY KEY (id)\n\
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;%s\n' % (bcolors.WARNING, bcolors.ENDC))
-        sys.stdout.write('%sCREATE USER "%s"@"%s" IDENTIFIED BY "%s";%s\n' % (
-            bcolors.WARNING, args.username, args.host, args.password, bcolors.ENDC))
-        sys.stdout.write('%sGRANT ALL PRIVILEGES ON `%s`.* TO "%s"@"%s";%s\n' % (
-            bcolors.WARNING, args.database, args.username, args.host, bcolors.ENDC))
-        sys.stdout.write('%sFLUSH PRIVILEGES;;%s\n' % (bcolors.WARNING, bcolors.ENDC))
-
-    """
-    Context 1.0.0 format:
-
-        {
-            version:  <string> - context version
-            id:       <long>   - unique message identifier
-            domain:   <string> - domain name of generated event (may be None)
-            time:     <int>    - unix timestamp (utc) of event
-            level:    <int>    - severity (1=DEBUG, 2=INFO, 4=NOTICE,
-                                           8=WARNING, 16=ERROR, 32=CRITICAL,
-                                           64=ALERT, 128=EMERGENCY)
-            source:   <int>    - source of event (1=statement, 2=error,
-                                                  3=exception)
-            message:  <string> - the message itself (utf-8)
-            filename: <string> - originating filename
-            line:     <int>    - originating line number
-            context:  <array>  - json encoded context
-        }
-    """
-
-    def add_entry(self, record):
-        try:
-            with self.mysql.cursor() as cursor:
-                sql = "INSERT into messages ( `domain` ,  `time` ,  `level` ,  `source` , `message` , `filename` , `line` , `context` ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-                parameters = (
-                    record['domain'],
-                    time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
-                    math.log(record['level'], 2) + 1, record['source'],
-                    record['message'],
-                    record['filename'],
-                    record['line'],
-                    record['context']
-                )
-                cursor.execute(sql, parameters)
-                self.mysql.commit()
-        except (mysql.ProgrammingError, mysql.OperationalError) as err:
-            if err.args[0] == 2006:
-                self.connect()
-                self.work(item)
-            else:
-                sys.stdout.write('%sMYSQL error: %s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
-            pass
-        except TypeError as err:
-            sys.stdout.write("%sFormat Error:%s%s\n" % (bcolors.FAIL, err, bcolors.ENDC))
-            pass
-
-    class mode:
-        totals = 1
-        latest = 2
-
-    class Domain:
-        def __init__(self, host, error_count):
-            self.host = host
-            self.error_count = error_count
-            pass
-
-    class Error:
-        def __init__(self, id, file, line, message, level, source, context, count, time, domain):
-            self.id = id
-            self.time = time
-            self.count = count
-            self.context = json.loads(base64.b64decode(context))
-            self.source = source
-            self.level = level
-            self.message = message
-            self.line = line
-            self.file = file
-            self.domain = domain
-
+    
     class levels:
         keys = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY']
         DEBUG = 0
@@ -240,5 +62,130 @@ CREATE TABLE `messages` (\n\
         ALERT = 6
         EMERGENCY = 7
 
-class ConnectionError(Exception):
-    pass
+    def __init__(self, args):
+        self.start_time = time.time() - (7 * 24 * 60 * 60)
+        self.end_time = time.time() + (24 * 60 * 60)
+        self.error_levels = {
+            self.levels.DEBUG: 1,
+            self.levels.INFO: 1,
+            self.levels.NOTICE: 1,
+            self.levels.WARNING: 1,
+            self.levels.ERROR: 1,
+            self.levels.CRITICAL: 1,
+            self.levels.ALERT: 1,
+            self.levels.EMERGENCY: 1,
+        }
+        try:
+            self.mysql = _mysql.connect(args.host, args.username, args.password, args.database)
+        except (_mysql_exceptions.OperationalError, _mysql_exceptions.ProgrammingError) as err:
+            sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
+            sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
+            sys.exit()
+
+    def format_time(self, ts):
+        return time.strftime("%Y-%m-%d", time.gmtime(ts))
+
+    def get_time_sql(self):
+        return 'DATE(time) >= "{}" AND DATE(time) <= "{}"'.format(self.format_time(self.start_time), self.format_time(self.end_time))
+
+    def get_level_sql(self):
+        return 'level IN ("{}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
+
+
+    def domains(self):
+        self.mysql.query('SELECT domain, count(*) as count FROM `messages` WHERE {} AND {} GROUP BY domain ORDER BY count DESC'.format(self.get_time_sql(), self.get_level_sql()))
+        result = self.mysql.use_result()
+        res = []
+        while True:
+            record = result.fetch_row()
+            if not record:
+                break
+            res.append(self.Domain(record[0][0], record[0][1]))
+        return res
+
+    def errors(self, host, mode):
+        if mode == self.mode.totals:
+            self.mysql.query('SELECT filename, line, message, level, source, context, count(*) as count, time FROM `messages` WHERE domain = "{}" AND {} AND {} GROUP BY filename, line ORDER BY count DESC'.format(host, self.get_time_sql(), self.get_level_sql()))
+        else:
+            self.mysql.query('SELECT filename, line, message, level, source, context, 1 as count, time FROM `messages` WHERE domain = "{}" AND {} AND {} ORDER BY time DESC'.format(host, self.get_time_sql(), self.get_level_sql()))
+        result = self.mysql.use_result()
+        res = []
+        while True:
+            record = result.fetch_row()
+            if not record:
+                break
+            res.append(self.Error(record[0][0], record[0][1], record[0][2], record[0][3], record[0][4], record[0][5], record[0][6], record[0][7]))
+        return res
+
+    class mode:
+        totals = 1
+        latest = 2
+
+
+    class Domain:
+        def __init__(self, host, error_count):
+            self.host = host
+            self.error_count = error_count
+            pass
+
+    class Error:
+        def __init__(self, file , line, message, level, source, context, count, time):
+            self.time = time
+            self.count = count
+            self.context = context
+            self.source = source
+            self.level = level
+            self.message = message
+            self.line = line
+            self.file = file
+
+
+'''
+
+        start_date = ('time >= "' + args.startDate + '"') if args.startDate else ''
+        end_date = ('time =< "' + args.endDate + '"') if args.endDate else ''
+
+        date_sql = ' AND '.join([i for i in ['1', start_date, end_date] if i != ''])
+
+        if args.domain is None:
+
+
+        elif args.method == 'totals':
+            mysql.query(
+                'SELECT filename, line, message, level, source, context, count(*) as count FROM `messages` WHERE ' + date_sql + ' AND domain = "' + args.domain + '" GROUP BY filename, line ORDER BY count DESC')
+            result = mysql.use_result()
+            sys.stdout.write('%s %-50s %-50s %-10s %-10s %-10s %-10s %s\n' % (
+                bcolors.UNDERLINE, ' ', ' ', '', '', '', '', bcolors.ENDC))
+            sys.stdout.write('%s|%-50s|%-50s|%-10s|%-10s|%-10s|%-10s|%s\n' % (
+                bcolors.UNDERLINE, 'File:Line', 'Message', 'Level', 'Source', 'Context', 'Count', bcolors.ENDC))
+            while True:
+                record = result.fetch_row()
+                if not record:
+                    break
+                sys.stdout.write('|%-44s:%-5s|%-50s|%-10s|%-10s|%-10s|%-10s|\n' % (
+                    record[0][0], record[0][1], record[0][2], record[0][3], record[0][4],
+                    base64.b64decode(record[0][5]),
+                    record[0][6]))
+        elif args.method == 'latest':
+            mysql.query(
+                'SELECT filename, line, message, level, source, context FROM `messages` WHERE ' + date_sql + ' AND domain = "' + args.domain + '" ORDER BY time DESC')
+            result = mysql.use_result()
+            sys.stdout.write('%s %-50s %-50s %-10s %-10s %-10s %s\n' % (
+                bcolors.UNDERLINE, ' ', ' ', '', '', '', bcolors.ENDC))
+            sys.stdout.write('%s|%-50s|%-50s|%-10s|%-10s|%-10s|%s\n' % (
+                bcolors.UNDERLINE, 'File:Line', 'Message', 'Level', 'Source', 'Context', bcolors.ENDC))
+            while True:
+                record = result.fetch_row()
+                if not record:
+                    break
+                sys.stdout.write('|%-44s:%-5s|%-50s|%-10s|%-10s|%-10s|\n' % (
+                    record[0][0], record[0][1], record[0][2], record[0][3], record[0][4],
+                    base64.b64decode(record[0][5])))
+            pass
+
+"""
+TODO
+----
+Need to be able to filter for event severity and/or event contents
+"""
+'''
