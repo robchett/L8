@@ -287,6 +287,7 @@ Key commands\n\
         self.screen2 = curses.newwin(self.window_height, self.window_width, self.window_height, 0)
         self.screen3 = curses.newwin(self.window_height, self.window_width, self.window_height * 2, 0)
 
+        stdscr.refresh()
         self.domain_list()
 
         while True:
