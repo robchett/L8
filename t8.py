@@ -225,7 +225,8 @@ Key commands\n\
             elif c == curses.KEY_DOWN:
                 self.options_index = min(self.options_index + 1, cnt - 1)
             elif c == ord(' '):
-                self.data.error_levels[self.options_index - 2] = self.data.error_levels[self.options_index - 2] = not self.data.error_levels[self.options_index - 2]
+                if self.options_index >= 2:
+                    self.data.error_levels[self.options_index - 2] = self.data.error_levels[self.options_index - 2] = not self.data.error_levels[self.options_index - 2]
             elif c == curses.KEY_LEFT:
                 if self.options_index == 0:
                     self.data.start_time -= 24 * 60 * 60
