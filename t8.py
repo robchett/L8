@@ -5,6 +5,7 @@ Static (mysql) Terminal viewer for the L8 redis-backed logger.
 
 Copyright (C) 2014-2015 Alan McFarlane <alan@node86.com>
 Copyright (C) 2014-2015 Rob Chett <robchett@gmail.com>
+Copyright (C) 2015 Ben Gosney <bengosney@googlemail.com>
 All Rights Reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -44,15 +45,33 @@ import _mysql_exceptions
 import base64
 import argparse
 import time
+import os.path
+import ConfigParser
 
 from data.data import Data
 
+
+config = ConfigParser.ConfigParser({
+        'database': 'S8',
+        'password': 'S8',
+        'username': 'S8',
+        'host'    : 'localhost',
+        'port'    : '3306',
+        })
+
+conf_path = os.path.expanduser('~') + '/.t8'
+
+if os.path.isfile(conf_path):
+    config.read(conf_path)
+else:
+    config.add_section('config')
+
 parser = argparse.ArgumentParser(description='Terminal viewer for L8 redis-backed logger.')
-parser.add_argument('-d', '--database', default='S8')
-parser.add_argument('-p', '--password', default='S8')
-parser.add_argument('-u', '--username', default='S8')
-parser.add_argument('--host', default='localhost')
-parser.add_argument('--port', default='3306')
+parser.add_argument('-d', '--database', default=config.get('config','database'))
+parser.add_argument('-p', '--password', default=config.get('config','password'))
+parser.add_argument('-u', '--username', default=config.get('config','username'))
+parser.add_argument('--host', default=config.get('config','host'))
+parser.add_argument('--port', default=config.get('config','port'))
 parser.add_argument('-s', '--startDate')
 parser.add_argument('-e', '--endDate')
 parser.add_argument('--domain')
@@ -63,7 +82,6 @@ args = parser.parse_args()
 
 if args.method in ['domain']:
     parser.error('A domain is required')
-
 
 class T8:
     class screens:
