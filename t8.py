@@ -113,6 +113,7 @@ class T8:
         self.screen1 = None
         self.screen2 = None
         self.screen3 = None
+        self.stdscr = None
 
         # Create looping function
         try:
@@ -125,7 +126,8 @@ class T8:
         self.clear()
         domains = self.data.domains()
         self.domain_max = len(domains)
-        self.screen1.addstr('{0: <{width}}'.format('Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS), curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
+        self.screen1.addstr('{0: <{width}}'.format('Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS),
+                            curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
         cnt = 0
         self.current_domain = None
         if self.domain_max:
@@ -153,9 +155,15 @@ class T8:
                 if self.error_index == cnt:
                     self.current_error = i
                 if self.should_skip(self.error_index, cnt, self.window_height):
-                    self.screen2.addstr(
-                        '{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(i.file[-30:], i.line, i.message.replace("\n", "|")[-79:], i.level, i.count, i.time, width1=30, width2=5, width3=80,
-                                                                                                                         width4=10, width5=5, width6=10), curses.color_pair(2 if self.error_index == cnt else 0))
+                    self.screen2.addstr('{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(
+                        i.file[-30:],
+                        i.line,
+                        i.message.replace("\n", "|")[-79:],
+                        i.level,
+                        i.count,
+                        Data.format_datetime(i.time),
+                        width1=30, width2=5, width3=80, width4=10, width5=5, width6=10
+                    ), curses.color_pair(2 if self.error_index == cnt else 0))
                 cnt += 1
 
             self.error_context()
@@ -166,7 +174,13 @@ class T8:
         if self.current_error:
             text = json.dumps(json.loads(base64.b64decode(self.current_error.context)), indent=4).split('\n')
             self.context_max = len(text)
-            self.screen3.addstr('{0: <{width}}'.format('Error Context ({0} of {1})'.format(self.context_index, self.context_max), width=curses.COLS), curses.color_pair(1 if self.screens.CONTEXT != self.current_screen else 3))
+            self.screen3.addstr('{0: <{width}}'.format(
+                'Error Context ({0} of {1})'.format(
+                    self.context_index,
+                    self.context_max
+                ),
+                width=curses.COLS
+            ), curses.color_pair(1 if self.screens.CONTEXT != self.current_screen else 3))
             cnt = 0
             for i in self.current_error.message.split('\n'):
                 self.screen3.addstr('{0: <{width}}'.format('{0}'.format(i), width=curses.COLS), curses.color_pair(4))
@@ -205,9 +219,9 @@ Key commands\n\
             cnt = 0
             self.screen1.addstr('Options\n')
             self.screen1.addstr('Dates\n')
-            self.screen1.addstr('\tStart date: {0}\n'.format(self.data.format_time(self.data.start_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            self.screen1.addstr('\tStart date: {0}\n'.format(self.data.format_timestamp(self.data.start_time)), curses.color_pair(2 if self.options_index == cnt else 0))
             cnt += 1
-            self.screen1.addstr('\tEnd date  : {0}\n'.format(self.data.format_time(self.data.end_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            self.screen1.addstr('\tEnd date  : {0}\n'.format(self.data.format_timestamp(self.data.end_time)), curses.color_pair(2 if self.options_index == cnt else 0))
             cnt += 1
             self.screen1.addstr('\n')
             self.screen1.addstr('Error levels\n')
@@ -274,7 +288,6 @@ Key commands\n\
         self.screen3 = curses.newwin(self.window_height, self.window_width, self.window_height * 2, 0)
 
         self.domain_list()
-        self.refresh()
 
         while True:
             c = self.stdscr.getch()
