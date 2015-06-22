@@ -123,7 +123,6 @@ class T8:
             pass
 
     def domain_list(self):
-        self.clear()
         domains = self.data.domains()
         self.domain_max = len(domains)
         self.screen1.addstr('{0: <{width}}'.format('Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS),
@@ -137,10 +136,9 @@ class T8:
                 if self.should_skip(self.domain_index, cnt, self.window_height):
                     self.screen1.addstr('{0: <{width1}}{1: >{width2}}'.format(i.host, i.error_count, width1=curses.COLS - 10, width2=10), curses.color_pair(2 if self.domain_index == cnt else 0))
                 cnt += 1
-            self.error_list()
-        self.refresh()
 
-    def should_skip(self, index, cnt, height):
+    @staticmethod
+    def should_skip(index, cnt, height):
         skip_cnt = (index - height + 4) if index + 4 > height else 0
         return cnt >= skip_cnt and (cnt - skip_cnt) < height - 2
 
@@ -165,8 +163,6 @@ class T8:
                         width1=30, width2=5, width3=80, width4=10, width5=5, width6=10
                     ), curses.color_pair(2 if self.error_index == cnt else 0))
                 cnt += 1
-
-            self.error_context()
         else:
             self.screen2.addstr('{0: <{width}}'.format('No domain', width=curses.COLS), curses.color_pair(3))
 
@@ -194,7 +190,7 @@ class T8:
             self.screen3.addstr('{0: <{width}}'.format('No error', width=curses.COLS), curses.color_pair(3))
 
     def get_help_screen(self):
-        self.clear()
+        self.clear(True, True, True)
         self.screen1.addstr('\
 Key commands\n\
     tab : move between windows \n\
@@ -205,7 +201,7 @@ Key commands\n\
     o   : Open the options screen'
                             )
 
-        self.refresh()
+        self.refresh(True, True, True)
 
         while True:
             c = self.stdscr.getch()
@@ -215,7 +211,7 @@ Key commands\n\
 
     def get_options_screen(self):
         while True:
-            self.clear()
+            self.clear(True, True, True)
             cnt = 0
             self.screen1.addstr('Options\n')
             self.screen1.addstr('Dates\n')
@@ -230,7 +226,7 @@ Key commands\n\
                 self.screen1.addstr('\t[{0}] {1}\n'.format('x' if self.data.error_levels[cnt - 2] else ' ', i), curses.color_pair(2 if self.options_index == cnt else 0))
                 cnt += 1
 
-            self.refresh()
+            self.refresh(True, True, True)
             c = self.stdscr.getch()
             if c == ord('q'):
                 return
@@ -252,16 +248,33 @@ Key commands\n\
                 elif self.options_index == 1:
                     self.data.end_time += 24 * 60 * 60
 
-    def refresh(self):
-        self.screen1.noutrefresh()
-        self.screen2.noutrefresh()
-        self.screen3.noutrefresh()
+    def refresh(self, screen1, screen2, screen3):
+        if screen1:
+            self.screen1.noutrefresh()
+        if screen2:
+            self.screen2.noutrefresh()
+        if screen3:
+            self.screen3.noutrefresh()
         curses.doupdate()
 
-    def clear(self):
-        self.screen1.clear()
-        self.screen2.clear()
-        self.screen3.clear()
+    def clear(self, screen1, screen2, screen3):
+        if screen1:
+            self.screen1.clear()
+        if screen2:
+            self.screen2.clear()
+        if screen3:
+            self.screen3.clear()
+
+    def redraw(self, level):
+        self.clear(level <= self.screens.DOMAINS, level <= self.screens.ERRORS, level <= self.screens.CONTEXT)
+        if level <=  self.screens.DOMAINS:
+            self.domain_list()
+        if level <= self.screens.ERRORS:
+            self.error_list()
+        if level <= self.screens.CONTEXT:
+            self.error_context()
+        self.refresh(level <= self.screens.DOMAINS, level <= self.screens.ERRORS, level <= self.screens.CONTEXT)
+
 
     def init_windows(self, stdscr):
         # Disable echo of key presses
@@ -288,7 +301,8 @@ Key commands\n\
         self.screen3 = curses.newwin(self.window_height, self.window_width, self.window_height * 2, 0)
 
         stdscr.refresh()
-        self.domain_list()
+
+        self.redraw(self.screens.DOMAINS)
 
         while True:
             c = self.stdscr.getch()
@@ -302,7 +316,7 @@ Key commands\n\
                     self.context_index = 0
                 elif self.current_screen == self.screens.CONTEXT:
                     self.context_index = max(self.context_index - 1, 0)
-                self.domain_list()
+                self.redraw(self.current_screen)
             elif c == curses.KEY_DOWN:
                 if self.current_screen == self.screens.DOMAINS:
                     self.domain_index = min(self.domain_index + 1, self.domain_max - 1)
@@ -313,19 +327,28 @@ Key commands\n\
                     self.context_index = 0
                 elif self.current_screen == self.screens.CONTEXT:
                     self.context_index = min(self.context_index + 1, self.context_max - 1)
-                self.domain_list()
+                self.redraw(self.current_screen)
             elif c == ord('a'):
                 self.error_mode = data.mode.totals if self.error_mode == data.mode.latest else data.mode.latest
-                self.domain_list()
+                self.redraw(self.screens.ERRORS)
+            elif c == curses.KEY_DC:
+                if self.current_screen == self.screens.ERRORS:
+                    if self.error_mode == data.mode.latest:
+                        self.data.delete_entry(self.current_error)
+                    else:
+                        self.data.delete_type(self.current_error)
+                self.current_error = None
+                self.context_index = 0
+                self.redraw(self.screens.ERRORS)
             elif c == ord('\t'):
                 self.current_screen = (self.current_screen + 1) if self.current_screen != self.screens.CONTEXT else self.screens.DOMAINS
-                self.domain_list()
+                self.redraw(self.screens.DOMAINS)
             elif c == ord('h'):
                 self.get_help_screen()
-                self.domain_list()
+                self.redraw(self.screens.DOMAINS)
             elif c == ord('o'):
                 self.get_options_screen()
-                self.domain_list()
+                self.redraw(self.screens.DOMAINS)
             elif c == ord('q'):
                 return True
 

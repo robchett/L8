@@ -80,6 +80,7 @@ class Consumer(threading.Thread):
             sys.stdout.write('%sCREATE DATABASE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
             sys.stdout.write('%s\
 CREATE TABLE `messages` (\n\
+  `id` int(11) NOT NULL AUTO_INCREMENT,\n\
   `domain` varchar(255) DEFAULT NULL,\n\
   `time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n\
   `level` enum("DEBUG","INFO","NOTICE","WARNING","ERROR","CRITICAL","ALERT","EMERGENCY") DEFAULT NULL,\n\
@@ -128,10 +129,14 @@ CREATE TABLE `messages` (\n\
                 return
 
             self.mysql.query("INSERT into messages ( `domain` ,  `time` ,  `level` ,  `source` , `message` , `filename` , `line` , `context` ) VALUES ('%s', '%s', %d, '%s', '%s', '%s', '%s', '%s')" % (
-                record['domain'], time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
+                self.mysql.escape(record['domain']),
+                time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
                 math.log(record['level'], 2) + 1, record['source'],
-                record['message'],
-                record['filename'], record['line'], record['context']))
+                self.mysql.escape(record['message']),
+                self.mysql.escape(record['filename']),
+                record['line'],
+                self.mysql.escape(record['context']))
+            )
 
         except (_mysql.ProgrammingError, _mysql.OperationalError) as err:
             if  err.args[0] == 2006:

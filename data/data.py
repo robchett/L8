@@ -113,13 +113,13 @@ class Data:
     def errors(self, host, mode):
         with self.mysql.cursor() as cursor:
             if mode == self.mode.totals:
-                cursor.execute('SELECT filename, line, message, level, source, context, count(*) as count, time FROM `messages` WHERE domain = "{0}" AND {1} AND {2} GROUP BY filename, line ORDER BY count DESC'.format(
+                cursor.execute('SELECT filename, line, message, level, source, context, count(*) as count, time, id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} GROUP BY filename, line ORDER BY count DESC'.format(
                     host,
                     self.get_time_sql(),
                     self.get_level_sql())
                 )
             else:
-                cursor.execute('SELECT filename, line, message, level, source, context, 1 as count, time FROM `messages` WHERE domain = "{0}" AND {1} AND {2} ORDER BY time DESC'.format(
+                cursor.execute('SELECT filename, line, message, level, source, context, 1 as count, time, id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} ORDER BY time DESC'.format(
                     host,
                     self.get_time_sql(),
                     self.get_level_sql())
@@ -129,8 +129,21 @@ class Data:
                 record = cursor.fetchone()
                 if not record:
                     break
-                res.append(self.Error(record[0], record[1], record[2], record[3], record[4], record[5], record[6], record[7]))
+                res.append(self.Error(record[8], record[0], record[1], record[2], record[3], record[4], record[5], record[6], record[7], record[9]))
             return res
+
+    def delete_type(self, error):
+        with self.mysql.cursor() as cursor:
+            cursor.execute('DELETE FROM messages WHERE line = {0} AND filename = {1} AND domain = {2} '.format(
+                error.line,
+                self.mysql.escape(error.file),
+                self.mysql.escape(error.domain)
+            )
+            )
+
+    def delete_entry(self, error):
+        with self.mysql.cursor() as cursor:
+            cursor.execute('DELETE FROM messages WHERE id = "{}"'.format(error.id))
 
     class mode:
         totals = 1
@@ -143,7 +156,8 @@ class Data:
             pass
 
     class Error:
-        def __init__(self, file, line, message, level, source, context, count, time):
+        def __init__(self, id, file, line, message, level, source, context, count, time, domain):
+            self.id = id
             self.time = time
             self.count = count
             self.context = context
@@ -152,3 +166,4 @@ class Data:
             self.message = message
             self.line = line
             self.file = file
+            self.domain = domain
