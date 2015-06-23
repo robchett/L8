@@ -35,22 +35,9 @@ POSSIBILITY OF SUCH DAMAGE.
 """
 
 import redis
-import threading
 import sys
-import time
 import argparse
-
-
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
+from data.bcolors import bcolors
 
 parser = argparse.ArgumentParser(description='Proxy for the L8 redis-backed logger.')
 parser.add_argument('host')
@@ -60,16 +47,17 @@ parser.add_argument('-v', '--verbose', action='store_true')
 args = parser.parse_args()
 
 
-class Consumer(threading.Thread):
-    def __init__(self, r1, r2, channels):
-        threading.Thread.__init__(self)
-        self.source = r1
-        self.destin = r2
+class Processor:
+    def __init__(self, channels):
+        self.source = redis.Redis(socket_connect_timeout=1)
+        self.destin = redis.Redis(args.host, args.port, socket_connect_timeout=1)
+        self.source.ping()
+        self.destin.ping()
         self.channels = channels
-        self.pubsub = self.source.pubsub()
+        self.pubsub = self.source.pubsub(ignore_subscribe_messages=True)
         self.pubsub.subscribe([channels])
 
-    def run(self):
+    def work(self):
         for item in self.pubsub.listen():
             if args.verbose:
                 sys.stdout.write('%sLog: %s%s\n' % (bcolors.OKGREEN, item['data'], bcolors.ENDC))
@@ -82,22 +70,10 @@ if __name__ == "__main__":
     sys.stdout.write('%s%s%s\n' % (bcolors.OKGREEN, "Press Ctrl-C to exit", bcolors.ENDC))
 
     try:
-        r1 = redis.Redis(socket_connect_timeout=1)
-        r2 = redis.Redis(args.host, args.port, socket_connect_timeout=1)
-
-        r1.ping()
-        r2.ping()
-
-        c = Consumer(r1, r2, args.subscription)
-        c.daemon = True
-        c.start()
-
-        try:
-            while True:
-                time.sleep(100)
-        except (KeyboardInterrupt, SystemExit):
-            pass
+        c = Processor(args.subscription)
+        c.work()
     except redis.ConnectionError as err:
         sys.stdout.write('%s%sConnection error%s\n' % (bcolors.UNDERLINE, bcolors.FAIL, bcolors.ENDC))
         sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
-        sys.exit()
+    except (KeyboardInterrupt, SystemExit):
+        pass
