@@ -44,6 +44,7 @@ import base64
 import time
 
 from data.data import Data
+from data.data import ConnectionError
 from data.config import args
 
 class T8:
@@ -317,5 +318,9 @@ Key commands\n\
 
 
 if __name__ == "__main__":
-    data = Data(args)
+    try:
+        data = Data(args)
+    except ConnectionError as err
+        sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
+        sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
     t8 = T8(data)

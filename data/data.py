@@ -51,17 +51,6 @@ mysql.install_as_MySQLdb()
 
 
 class Data:
-    class levels:
-        keys = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY']
-        DEBUG = 0
-        INFO = 1
-        NOTICE = 2
-        WARNING = 3
-        ERROR = 4
-        CRITICAL = 5
-        ALERT = 6
-        EMERGENCY = 7
-
     def __init__(self, args):
         self.start_time = time.time() - (7 * 24 * 60 * 60)
         self.end_time = time.time() + (24 * 60 * 60)
@@ -78,9 +67,7 @@ class Data:
         try:
             self.mysql = mysql.connect(args.host, args.username, args.password, args.database)
         except (mysql_exceptions.OperationalError, mysql_exceptions.ProgrammingError) as err:
-            sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
-            sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
-            sys.exit()
+            raise ConnectionError(err)
 
     @staticmethod
     def format_timestamp(ts):
@@ -148,6 +135,75 @@ class Data:
             cursor.execute("DELETE FROM messages WHERE id = %s", error.id)
             self.mysql.commit()
 
+    @staticmethod
+    def invalid_connection(err, args):
+        sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
+        sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
+        sys.stdout.write('%sCREATE DATABASE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
+        sys.stdout.write('%s\
+CREATE TABLE `messages` (\n\
+  `id` int(11) NOT NULL AUTO_INCREMENT,\n\
+  `domain` varchar(255) DEFAULT NULL,\n\
+  `time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n\
+  `level` enum("DEBUG","INFO","NOTICE","WARNING","ERROR","CRITICAL","ALERT","EMERGENCY") DEFAULT NULL,\n\
+  `source` enum("STATEMENT","ERROR","EXCEPTION") DEFAULT NULL,\n\
+  `message` text,\n\
+  `filename` varchar(255) DEFAULT NULL,\n\
+  `line` int(10) DEFAULT NULL,\n\
+  `context` text\n\
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;%s\n' % (bcolors.WARNING, bcolors.ENDC))
+        sys.stdout.write('%sCREATE USER "%s"@"%s" IDENTIFIED BY "%s";%s\n' % (
+            bcolors.WARNING, args.username, args.host, args.password, bcolors.ENDC))
+        sys.stdout.write('%sGRANT ALL PRIVILEGES ON `%s`.* TO "%s"@"%s";%s\n' % (
+            bcolors.WARNING, args.database, args.username, args.host, bcolors.ENDC))
+        sys.stdout.write('%sFLUSH PRIVILEGES;;%s\n' % (bcolors.WARNING, bcolors.ENDC))
+
+    """
+    Context 1.0.0 format:
+
+        {
+            version:  <string> - context version
+            id:       <long>   - unique message identifier
+            domain:   <string> - domain name of generated event (may be None)
+            time:     <int>    - unix timestamp (utc) of event
+            level:    <int>    - severity (1=DEBUG, 2=INFO, 4=NOTICE,
+                                           8=WARNING, 16=ERROR, 32=CRITICAL,
+                                           64=ALERT, 128=EMERGENCY)
+            source:   <int>    - source of event (1=statement, 2=error,
+                                                  3=exception)
+            message:  <string> - the message itself (utf-8)
+            filename: <string> - originating filename
+            line:     <int>    - originating line number
+            context:  <array>  - json encoded context
+        }
+    """
+
+    def add_entry(self, record):
+        try:
+            with self.mysql.cursor() as cursor:
+                sql = "INSERT into messages ( `domain` ,  `time` ,  `level` ,  `source` , `message` , `filename` , `line` , `context` ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                parameters = (
+                    record['domain'],
+                    time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
+                    math.log(record['level'], 2) + 1, record['source'],
+                    record['message'],
+                    record['filename'],
+                    record['line'],
+                    record['context']
+                )
+                cursor.execute(sql, parameters)
+                self.mysql.commit()
+        except (mysql.ProgrammingError, mysql.OperationalError) as err:
+            if err.args[0] == 2006:
+                self.connect()
+                self.work(item)
+            else:
+                sys.stdout.write('%sMYSQL error: %s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
+            pass
+        except TypeError as err:
+            sys.stdout.write("%sFormat Error:%s%s\n" % (bcolors.FAIL, err, bcolors.ENDC))
+            pass
+
     class mode:
         totals = 1
         latest = 2
@@ -170,3 +226,17 @@ class Data:
             self.line = line
             self.file = file
             self.domain = domain
+
+    class levels:
+        keys = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY']
+        DEBUG = 0
+        INFO = 1
+        NOTICE = 2
+        WARNING = 3
+        ERROR = 4
+        CRITICAL = 5
+        ALERT = 6
+        EMERGENCY = 7
+
+class ConnectionError(Exception):
+    pass
