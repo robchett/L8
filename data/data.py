@@ -134,16 +134,19 @@ class Data:
 
     def delete_type(self, error):
         with self.mysql.cursor() as cursor:
-            cursor.execute('DELETE FROM messages WHERE line = {0} AND filename = {1} AND domain = {2} '.format(
+            sql = "DELETE FROM messages WHERE line = %s AND filename = %s AND domain = %s"
+            parameters = (
                 error.line,
-                self.mysql.escape(error.file),
-                self.mysql.escape(error.domain)
+                error.file,
+                error.domain
             )
-            )
+            cursor.execute(sql, parameters)
+            self.mysql.commit()
 
     def delete_entry(self, error):
         with self.mysql.cursor() as cursor:
-            cursor.execute('DELETE FROM messages WHERE id = "{}"'.format(error.id))
+            cursor.execute("DELETE FROM messages WHERE id = %s", error.id)
+            self.mysql.commit()
 
     class mode:
         totals = 1
