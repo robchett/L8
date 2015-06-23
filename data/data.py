@@ -66,14 +66,14 @@ class Data:
         self.start_time = time.time() - (7 * 24 * 60 * 60)
         self.end_time = time.time() + (24 * 60 * 60)
         self.error_levels = {
-            self.levels.DEBUG: 1,
-            self.levels.INFO: 1,
-            self.levels.NOTICE: 1,
-            self.levels.WARNING: 1,
-            self.levels.ERROR: 1,
-            self.levels.CRITICAL: 1,
-            self.levels.ALERT: 1,
-            self.levels.EMERGENCY: 1,
+            self.levels.DEBUG: args.eDEBUG,
+            self.levels.INFO: args.eINFO,
+            self.levels.NOTICE: args.eNOTICE,
+            self.levels.WARNING: args.eWARNING,
+            self.levels.ERROR: args.eERROR,
+            self.levels.CRITICAL: args.eCRITICAL,
+            self.levels.ALERT: args.eALERT,
+            self.levels.EMERGENCY: args.eEMERGENCY,
         }
         try:
             self.mysql = mysql.connect(args.host, args.username, args.password, args.database)
