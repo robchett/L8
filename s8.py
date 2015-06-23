@@ -40,13 +40,15 @@ import math
 import redis
 import sys
 import threading
-import _mysql
-import _mysql_exceptions
+import pymysql as mysql
+import pymysql.err as mysql_exceptions
 import time
 import re
 import base64
 import argparse
 from data.bcolors import bcolors
+
+mysql.install_as_MySQLdb()
 
 parser = argparse.ArgumentParser(description='Static (mysql) log for the L8 redis-backed logger.')
 parser.add_argument('-s', '--subscription', default='L8')
@@ -67,14 +69,15 @@ class Consumer(threading.Thread):
         self.pubsub.subscribe(channels)
         self.map = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY']
         self.domains = domains
+        self.mysql = None
         self.connect()
 
     def connect(self):
         try:
-            self.mysql = _mysql.connect(args.host, args.username, args.password, args.database)
-            self.mysql.query('SELECT * FROM `messages` LIMIT 1')
-            result = self.mysql.use_result()
-        except (_mysql_exceptions.OperationalError, _mysql_exceptions.ProgrammingError) as err:
+            self.mysql = mysql.connect(args.host, args.username, args.password, args.database)
+            with self.mysql.cursor() as cursor:
+                cursor.execute('SELECT * FROM `messages` LIMIT 1')
+        except (mysql_exceptions.OperationalError, mysql_exceptions.ProgrammingError) as err:
             sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
             sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
             sys.stdout.write('%sCREATE DATABASE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
@@ -124,22 +127,27 @@ CREATE TABLE `messages` (\n\
 
     def work(self, item):
         try:
-            record = json.loads(item['data'])
-            if not self.watching(record['domain']):
-                return
+            if not isinstance(item['data'], long):
+                record = json.loads(item['data'])
+                if not self.watching(record['domain']):
+                    return
 
-            self.mysql.query("INSERT into messages ( `domain` ,  `time` ,  `level` ,  `source` , `message` , `filename` , `line` , `context` ) VALUES ('%s', '%s', %d, '%s', '%s', '%s', '%s', '%s')" % (
-                self.mysql.escape(record['domain']),
-                time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
-                math.log(record['level'], 2) + 1, record['source'],
-                self.mysql.escape(record['message']),
-                self.mysql.escape(record['filename']),
-                record['line'],
-                self.mysql.escape(record['context']))
-            )
+                with self.mysql.cursor() as cursor:
+                    sql = "INSERT into messages ( `domain` ,  `time` ,  `level` ,  `source` , `message` , `filename` , `line` , `context` ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+                    parameters = (
+                        record['domain'],
+                        time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
+                        math.log(record['level'], 2) + 1, record['source'],
+                        record['message'],
+                        record['filename'],
+                        record['line'],
+                        record['context']
+                    )
+                    cursor.execute(sql, parameters)
+                    self.mysql.commit()
 
-        except (_mysql.ProgrammingError, _mysql.OperationalError) as err:
-            if  err.args[0] == 2006:
+        except (mysql.ProgrammingError, mysql.OperationalError) as err:
+            if err.args[0] == 2006:
                 self.connect()
                 self.work(item)
             else:
