@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.6
+#!/usr/bin/env python
 """
 M8.php
 Command-Line monitor for the L8 redis-backed logger.
