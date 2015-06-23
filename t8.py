@@ -40,13 +40,8 @@ import json
 import curses
 from curses import wrapper
 import sys
-import _mysql
-import _mysql_exceptions
 import base64
-import argparse
 import time
-import os.path
-import ConfigParser
 
 from data.data import Data
 from data.config import args
