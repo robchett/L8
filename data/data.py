@@ -140,6 +140,7 @@ class Data:
         sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
         sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
         sys.stdout.write('%sCREATE DATABASE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
+	sys.stdout.write('%sUSE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
         sys.stdout.write('%s\
 CREATE TABLE `messages` (\n\
   `id` int(11) NOT NULL AUTO_INCREMENT,\n\
