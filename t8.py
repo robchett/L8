@@ -320,7 +320,7 @@ Key commands\n\
 if __name__ == "__main__":
     try:
         data = Data(args)
+	t8 = T8(data)
     except ConnectionError as err:
-        sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
-        sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
-    t8 = T8(data)
+	Data.invalid_connection(err, args)
+        
