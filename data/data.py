@@ -151,7 +151,8 @@ CREATE TABLE `messages` (\n\
   `message` text,\n\
   `filename` varchar(255) DEFAULT NULL,\n\
   `line` int(10) DEFAULT NULL,\n\
-  `context` text\n\
+  `context` text,\n\
+  PRIMARY KEY (id)\n\
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;%s\n' % (bcolors.WARNING, bcolors.ENDC))
         sys.stdout.write('%sCREATE USER "%s"@"%s" IDENTIFIED BY "%s";%s\n' % (
             bcolors.WARNING, args.username, args.host, args.password, bcolors.ENDC))
