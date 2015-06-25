@@ -40,7 +40,6 @@ import json
 import curses
 from curses import wrapper
 import sys
-import base64
 import time
 
 from data.data import Data
@@ -132,7 +131,7 @@ class T8:
 
     def error_context(self):
         if self.current_error:
-            text = json.dumps(json.loads(base64.b64decode(self.current_error.context)), indent=4).split('\n')
+            text = json.dumps(self.current_error.context, indent=4).split('\n')
             self.context_max = len(text)
             self.screen3.addstr('{0: <{width}}'.format(
                 'Error Context ({0} of {1})'.format(
