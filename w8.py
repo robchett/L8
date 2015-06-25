@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
+import json
+
 from data.data import Data
-from data.conf import args
+from data.config import args
 from flask import Flask, jsonify
 
 app = Flask(__name__)
 
-errors = Data(args)
+errors_obj = Data(args)
 
 def list_routes():
     import urllib
@@ -37,8 +39,14 @@ def domains():
     """
     List the domains that have errors
     """
-    
-    return jsonify(errors.domains())
+    domains = errors_obj.domains()
+    json_domains = []
+
+    for d in domains:
+        json_domains.append(d.__dict__)
+
+    return jsonify({'domains':json_domains})
+
 
 @app.route(base_path + 'errors/<string:host>/<string:mode>/')
 def errors(host, mode):
@@ -46,7 +54,7 @@ def errors(host, mode):
     List the errors for a domain
     """
 
-    return jsonify(errors.errors(host, mode))
+    return jsonify(errors_obj.errors(host, mode))
 
 
 if __name__ == '__main__':

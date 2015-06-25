@@ -207,13 +207,13 @@ CREATE TABLE `messages` (\n\
         totals = 1
         latest = 2
 
-    class Domain(JSONSerializable):
+    class Domain:
         def __init__(self, host, error_count):
             self.host = host
             self.error_count = error_count
             pass
 
-    class Error(JSONSerializable):
+    class Error:
         def __init__(self, id, file, line, message, level, source, context, count, time, domain):
             self.id = id
             self.time = time
