@@ -35,8 +35,8 @@ POSSIBILITY OF SUCH DAMAGE.
 """
 
 import redis
-import sys
 import argparse
+from data.subscriber import Subscriber
 from data.bcolors import bcolors
 
 parser = argparse.ArgumentParser(description='Proxy for the L8 redis-backed logger.')
@@ -48,32 +48,28 @@ args = parser.parse_args()
 
 
 class Processor:
-    def __init__(self, channels):
-        self.source = redis.Redis(socket_connect_timeout=1)
+    def __init__(self, channel):
         self.destin = redis.Redis(args.host, args.port, socket_connect_timeout=1)
-        self.source.ping()
         self.destin.ping()
-        self.channels = channels
-        self.pubsub = self.source.pubsub(ignore_subscribe_messages=True)
-        self.pubsub.subscribe([channels])
+        self.channel = channel
 
-    def work(self):
-        for item in self.pubsub.listen():
-            if args.verbose:
-                sys.stdout.write('%sLog: %s%s\n' % (bcolors.OKGREEN, item['data'], bcolors.ENDC))
-            self.destin.publish(self.channels, item['data'])
+    def work(self, item):
+        if args.verbose:
+            bcolors.print_colour("Log: %s\n" % item['data'], bcolors.OKGREEN)
+        self.destin.publish(self.channel, item['data'])
 
 
 if __name__ == "__main__":
-    sys.stdout.write('%s%s%s%s\n' % (bcolors.UNDERLINE, bcolors.OKGREEN, "P8: L8 proxy", bcolors.ENDC))
-    sys.stdout.write('%sProxy endpoint: %s:%s%s\n' % (bcolors.OKGREEN, args.host, args.port, bcolors.ENDC))
-    sys.stdout.write('%s%s%s\n' % (bcolors.OKGREEN, "Press Ctrl-C to exit", bcolors.ENDC))
+    bcolors.print_colour("P8: L8 proxy\n", bcolors.OKGREEN, bcolors.UNDERLINE)
+    bcolors.print_colour('Proxy endpoint: %s:%s\n' % (args.host, args.port), bcolors.OKGREEN)
+    bcolors.print_colour("Press Ctrl-C to exit", bcolors.OKGREEN)
 
     try:
         c = Processor(args.subscription)
-        c.work()
+        s = Subscriber(args.subscription)
+        s.work_raw(c.work)
     except redis.ConnectionError as err:
-        sys.stdout.write('%s%sConnection error%s\n' % (bcolors.UNDERLINE, bcolors.FAIL, bcolors.ENDC))
-        sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
+        bcolors.print_colour('Connection error\n', bcolors.FAIL, bcolors.UNDERLINE)
+        bcolors.print_colour(err, bcolors.FAIL)
     except (KeyboardInterrupt, SystemExit):
         pass

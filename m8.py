@@ -34,16 +34,12 @@ POSSIBILITY OF SUCH DAMAGE.
 """
 
 import datetime
-import json
 import math
 import redis
-import sys
 import time
-import re # regular expressions
-import base64
 import argparse
 from data.bcolors import bcolors
-
+from data.subscriber import Subscriber
 
 parser = argparse.ArgumentParser(description='Static (mysql) log for the L8 redis-backed logger.')
 parser.add_argument('-s', '--subscription', default='L8')
@@ -52,11 +48,7 @@ args = parser.parse_args()
 
 
 class Processor:
-    def __init__(self, channels, domains):
-        self.redis = redis.Redis()
-        self.redis.ping()
-        self.pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
-        self.pubsub.subscribe(channels)
+    def __init__(self, domains):
         self.map = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY']
         self.domains = domains
 
@@ -65,77 +57,34 @@ class Processor:
             return True
         return domain in [s.lower() for s in self.domains]
 
-    """
-    Context 1.0.0 format:
+    def work(self, record):
+        if self.watching(record['domain']):
+            bcolors.print_colour(datetime.datetime.fromtimestamp(record['time']).strftime('[%Y-%m-%d %H:%M:%S]'), bcolors.OKBLUE)
 
-        {
-            version:  <string> - context version
-            id:       <long>   - unique message identifier
-            domain:   <string> - domain name of generated event (may be None)
-            time:     <int>    - unix timestamp (utc) of event
-            level:    <int>    - severity (1=DEBUG, 2=INFO, 4=NOTICE,
-                                           8=WARNING, 16=ERROR, 32=CRITICAL,
-                                           64=ALERT, 128=EMERGENCY)
-            source:   <int>    - source of event (1=statement, 2=error,
-                                                  3=exception)
-            message:  <string> - the message itself (utf-8)
-            filename: <string> - originating filename
-            line:     <int>    - originating line number
-            context:  <array>  - json encoded context
-        }
-    """
+            if record['domain'] is not None:
+                bcolors.print_colour(' <' + record['domain'] + '> ', bcolors.OKGREEN)
 
-    def work(self):
-        for item in self.pubsub.listen():
-            try:
-                record = json.loads(item['data'])
-                if self.watching(record['domain']):
+            bcolors.print_colour(' %s "%s"' % (self.map[int(math.log(record['level'], 2))], record['message']), bcolors.WARNING)
 
-                    sys.stdout.write(
-                        bcolors.OKBLUE +
-                        datetime.datetime.fromtimestamp(record['time']).strftime('[%Y-%m-%d %H:%M:%S]') +
-                        bcolors.ENDC
-                    )
+            if len(record['filename']):
+                bcolors.print_colour(" in ", bcolors.ENDC)
+                bcolors.print_colour(record['filename'], bcolors.FAIL)
+                if record['line'] > 0:
+                    bcolors.print_colour(":%d" % record['line'], bcolors.FAIL)
 
-                    if record['domain'] is not None:
-                        sys.stdout.write(
-                            bcolors.OKGREEN +
-                            ' <' + record['domain'] + '> ' +
-                            bcolors.ENDC
-                        )
+            bcolors.print_colour(" %s\n" % record['context'], bcolors.ENDC)
 
-                    sys.stdout.write(bcolors.WARNING)
-                    sys.stdout.write(' %s "%s"' % (self.map[int(math.log(record['level'], 2))], record['message']))
-                    sys.stdout.write(bcolors.ENDC)
-
-                    if len(record['filename']):
-                        sys.stdout.write(" in %s%s" % (bcolors.FAIL, record['filename']))
-                        if record['line'] > 0:
-                            sys.stdout.write(":%d" % record['line'])
-                        sys.stdout.write(bcolors.ENDC)
-                    sys.stdout.write(' ')
-
-                    regex = re.compile('^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)$')
-                    if (regex.match(record['context'])):
-                        context = base64.b64decode(record['context'])
-                    else:
-                        context = record['context']
-
-                    sys.stdout.write(context)
-                    sys.stdout.write("\n")
-            except (TypeError, ValueError):
-                # ignore any message that cannot be correctly decoded
-                pass
 
 if __name__ == "__main__":
     domains = args.domains.split(' ')
-    sys.stdout.write('%s%s%s%s\n' % (bcolors.UNDERLINE, bcolors.OKGREEN, "L8: command-line monitor", bcolors.ENDC))
-    sys.stdout.write('%s%s%s\n' % (bcolors.OKGREEN, "Monitoring: %s domain(s)" % ', '.join(domains), bcolors.ENDC))
-    sys.stdout.write('%s%s%s\n' % (bcolors.OKGREEN, "Press Ctrl-C to exit", bcolors.ENDC))
+    bcolors.print_colour("L8: command-line monitor\n", bcolors.OKGREEN, bcolors.UNDERLINE)
+    bcolors.print_colour("Monitoring: %s domain(s)\n" % ', '.join(domains), bcolors.OKGREEN, )
+    bcolors.print_colour("Press Ctrl-C to exit\n", bcolors.OKGREEN, )
 
     try:
-        c = Processor([args.subscription], [s.lower() for s in domains])
-        c.work()
+        s = Subscriber(args.subscription)
+        c = Processor([d.lower() for d in domains])
+        s.work(c.work)
     except redis.ConnectionError as err:
         sys.stdout.write('%s%sConnection error%s\n' % (bcolors.UNDERLINE, bcolors.FAIL, bcolors.ENDC))
         sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))

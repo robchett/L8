@@ -34,31 +34,21 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 """
 
-import json
-import redis
-import sys
 from data.bcolors import bcolors
 from data.config import args
 from data.data import Data
 from data.data import ConnectionError
+from data.subscriber import Subscriber
+
 
 class Processor:
-    def __init__(self, subscription='L8', args=args):
-        self.redis = redis.Redis()
-        self.pubsub = self.redis.pubsub(ignore_subscribe_messages=True)
-        self.pubsub.subscribe(subscription)
-        self.domains = args.domains
-        try:
-            self.data = Data(args)
-        except ConnectionError as err:
-            Data.invalid_connection(err, args)
-            raise StopIteration()
+    def __init__(self, data, domains):
+        self.data = data
+        self.domains = domains
 
-    def work(self):
-        for item in self.pubsub.listen():
-            record = json.loads(item['data'])
-            if self.watching(record['domain']):
-                self.data.add_entry(record)
+    def work(self, entry):
+        if self.watching(entry['domain']):
+            self.data.add_entry(entry)
 
     def watching(self, domain):
         if 'all' in self.domains or (domain is None and 'none' in self.domains):
@@ -68,14 +58,18 @@ class Processor:
 
 if __name__ == "__main__":
     domains = args.domains.split(' ')
-    sys.stdout.write('%s%s%s%s\n' % (bcolors.UNDERLINE, bcolors.OKGREEN, "S8: Mysql Stasher", bcolors.ENDC))
-    sys.stdout.write('%s%s%s\n' % (bcolors.OKGREEN, "Stashing: %s domain(s)" % ', '.join(domains), bcolors.ENDC))
-    sys.stdout.write('%s%s%s\n' % (bcolors.OKGREEN, "Press Ctrl-C to exit", bcolors.ENDC))
+    bcolors.print_colour("S8: Mysql Stasher\n", bcolors.OKGREEN, bcolors.UNDERLINE)
+    bcolors.print_colour("Stashing: %s domain(s)\n", bcolors.OKGREEN)
+    bcolors.print_colour("Press Ctrl-C to exit\n", bcolors.OKGREEN)
     try:
-        c = Processor(subscription=args.subscription, args=args)
-        c.work()
+        data = Data(args)
+        c = Processor(data, domains)
+        s = Subscriber(args.subscription)
+        s.work(c.work, False)
     except (KeyboardInterrupt, SystemExit, StopIteration):
         pass
+    except ConnectionError as err:
+        Data.invalid_connection(err, args)
 
 """
 TODO
