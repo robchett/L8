@@ -3,6 +3,9 @@
 import json
 import hashlib
 
+import time
+import datetime
+
 from data.data import Data
 from data.config import args
 from flask import Flask, jsonify
@@ -60,9 +63,21 @@ def errors(host, mode=1):
     json_errs = []
 
     for e in errs:
-        json_errs.append(e.__dict__)
+        err_dict = e.__dict__
+        #err_dict['timestamp'] = int(time.mktime(err_dict['time'].timetuple()))
+        json_errs.append(err_dict)
 
     return jsonify({'errors':json_errs, 'hash': hashlib.md5(str(json_errs)).hexdigest()})
+
+@app.route(base_path + 'levels/')
+def error_levels():
+    """
+    List the error levels
+    """
+
+    errors_obj = Data(args)
+    
+    return jsonify({'levels': errors_obj.levels.keys})
 
 @app.route('/')
 def template():
