@@ -26,3 +26,7 @@ Tool to ship L8 messages of server
 ## T8
 
 Tool to view messages logged via S8
+
+## A8
+
+Tool used to alert of excess error via email or push notifications
