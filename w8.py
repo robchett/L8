@@ -125,7 +125,7 @@ def error_levels():
 
 @app.route('/')
 def template():
-    return open('template.html').read(100000)
+    return open('data/template.html').read(100000)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
