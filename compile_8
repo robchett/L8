@@ -1,0 +1,24 @@
+#!/bin/bash
+
+rm -rf compiled
+mkdir -p compiled
+
+for f in *8.py; do
+    echo "found ${f}"
+
+    filename=$(basename "$f")
+    filename="${filename%.*}"
+    TMP_FILE="${filename}_tmp"   
+    
+    mkdir -p $TMP_FILE
+    
+    cp -R data $TMP_FILE
+    cp $f $TMP_FILE/__main__.py
+    
+    zip -r $filename.zip $TMP_FILE/*
+    
+    echo '#!/usr/bin/env python' | cat - "${filename}.zip" > "compiled/${filename}"
+    
+    rm -rf $TMP_FILE
+    rm -f $filename.zip
+done
