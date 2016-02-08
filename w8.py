@@ -8,7 +8,7 @@ import datetime
 
 from data.data import Data
 from data.config import args
-from flask import Flask, jsonify
+from flask import Flask, jsonify, url_for
 
 app = Flask(__name__)
 
@@ -28,8 +28,8 @@ def pretty_date(time=False):
     pretty string like 'an hour ago', 'Yesterday', '3 months ago',
     'just now', etc
     """
-    from datetime import datetime
-    now = datetime.now()
+    from datetime import datetime, timedelta
+    now = datetime.now() - timedelta(hours=1)
     if type(time) is int:
         diff = now - datetime.fromtimestamp(time)
     elif isinstance(time,datetime):
@@ -76,7 +76,7 @@ def api():
     return jsonify({
             'success' : True,
             'version' : 1.0,
-            'methods' : list_routes()
+            'methods' : list_routes(),
             })
 
 @app.route(base_path + 'domain/list/')
@@ -95,7 +95,7 @@ def domains():
 
 
 @app.route(base_path + 'domain/<string:host>/errors/')
-@app.route(base_path + 'domain/<string:host>/errors/<string:mode>/')
+@app.route(base_path + 'domain/<string:host>/errors/<int:mode>/')
 def errors(host, mode=1):
     """
     List the errors for a domain
