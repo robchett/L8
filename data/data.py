@@ -68,6 +68,9 @@ class Data:
         except (mysql_exceptions.OperationalError, mysql_exceptions.ProgrammingError) as err:
             raise ConnectionError(err)
 
+    def __del__(self):
+        self.mysql.close()
+
     @staticmethod
     def format_timestamp(ts):
         return time.strftime('%Y-%m-%d', time.gmtime(ts))
