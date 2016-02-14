@@ -85,11 +85,22 @@ class T8:
             curses.endwin()
             pass
 
+    def write_lines(self, screen, string, color):
+        width = 0
+        while width < len(string):
+            width += curses.COLS
+
+        screen.addstr('{0: <{width}}'.format(string, width=width), curses.color_pair(color))
+
+
     def domain_list(self):
         domains = self.data.domains()
         self.domain_max = len(domains)
-        self.screen1.addstr('{0: <{width}}'.format('Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS),
-                            curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
+        self.write_lines(
+            self.screen1,
+            'Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()),
+            1 if self.screens.DOMAINS != self.current_screen else 3
+        )
         cnt = 0
         self.current_domain = None
         if self.domain_max:
@@ -106,7 +117,11 @@ class T8:
         return cnt >= skip_cnt and (cnt - skip_cnt) < height - 2
 
     def error_list(self):
-        self.screen2.addstr('{0: <{width}}'.format('Errors ({0} of {1})'.format(self.error_index + 1, self.error_max), width=curses.COLS), curses.color_pair(1 if self.screens.ERRORS != self.current_screen else 3))
+        self.write_lines(
+            self.screen2,
+            'Errors ({0} of {1})'.format(self.error_index + 1, self.error_max),
+            1 if self.screens.ERRORS != self.current_screen else 3
+        )
         if self.current_domain:
             errors = self.data.errors(self.current_domain.host, self.error_mode)
             self.error_max = len(errors)
@@ -127,22 +142,28 @@ class T8:
                     ), curses.color_pair(2 if self.error_index == cnt else 0))
                 cnt += 1
         else:
-            self.screen2.addstr('{0: <{width}}'.format('No domain', width=curses.COLS), curses.color_pair(3))
+            self.write_lines(
+                self.screen2,
+                'No domain',
+                3
+            )
 
     def error_context(self):
         if self.current_error:
             text = json.dumps(self.current_error.context, indent=4).split('\n')
             self.context_max = len(text)
-            self.screen3.addstr('{0: <{width}}'.format(
-                'Error Context ({0} of {1})'.format(
-                    self.context_index,
-                    self.context_max
-                ),
-                width=curses.COLS
-            ), curses.color_pair(1 if self.screens.CONTEXT != self.current_screen else 3))
+            self.write_lines(
+                self.screen3,
+                'Error Context ({0} of {1})'.format(self.context_index,self.context_max),
+                1 if self.screens.CONTEXT != self.current_screen else 3
+            )
             cnt = 0
             for i in self.current_error.message.split('\n'):
-                self.screen3.addstr('{0: <{width}}'.format('{0}'.format(i), width=curses.COLS), curses.color_pair(4))
+                self.write_lines(
+                    self.screen3,
+                    '{0}'.format(i),
+                    4
+                )
                 cnt += max(math.ceil(len(self.current_error.message) / self.window_width), 1)
             total = self.window_height - cnt
             for i in text:
@@ -150,7 +171,11 @@ class T8:
                     self.screen3.addstr('{0}\n'.format(i))
                 cnt += max(math.ceil(len(i) / self.window_width), 1)
         else:
-            self.screen3.addstr('{0: <{width}}'.format('No error', width=curses.COLS), curses.color_pair(3))
+            self.write_lines(
+                self.screen3,
+                'No error',
+                3
+            )
 
     def get_help_screen(self):
         self.clear(True, True, True)
@@ -202,6 +227,7 @@ Key commands\n\
                     self.data.error_levels[self.options_index - 2] = self.data.error_levels[self.options_index - 2] = not self.data.error_levels[self.options_index - 2]
             elif c == curses.KEY_LEFT:
                 if self.options_index == 0:
+                    self.data.start_time -= 24 * 60 * 60
                     self.data.start_time -= 24 * 60 * 60
                 elif self.options_index == 1:
                     self.data.end_time -= 24 * 60 * 60
