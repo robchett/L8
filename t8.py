@@ -68,6 +68,7 @@ class T8:
 
         self.window_height = 0
         self.window_width = 0
+        self.screen_offsets = [0, 0, 0]
 
         self.current_domain = None
         self.current_error = None
@@ -86,17 +87,18 @@ class T8:
             pass
 
     def write_lines(self, screen, string, color):
-        width = 0
-        while width < len(string):
-            width += curses.COLS
+        lines = 0
+        while (lines * curses.COLS) < len(string):
+            lines += 1
 
-        screen.addstr('{0: <{width}}'.format(string, width=width), curses.color_pair(color))
+        screen.addstr('{0: <{width}}'.format(string, width=(lines * curses.COLS)), curses.color_pair(color))
+        return lines
 
 
     def domain_list(self):
         domains = self.data.domains()
         self.domain_max = len(domains)
-        self.write_lines(
+        self.screen_offsets[0] = self.write_lines(
             self.screen1,
             'Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()),
             1 if self.screens.DOMAINS != self.current_screen else 3
@@ -107,17 +109,16 @@ class T8:
             for i in domains:
                 if self.domain_index == cnt:
                     self.current_domain = i
-                if self.should_skip(self.domain_index, cnt, self.window_height):
+                if self.should_skip(self.domain_index, cnt, self.window_height, 1):
                     self.screen1.addstr('{0: <{width1}}{1: >{width2}}'.format(i.host, i.error_count, width1=curses.COLS - 10, width2=10), curses.color_pair(2 if self.domain_index == cnt else 0))
                 cnt += 1
 
-    @staticmethod
-    def should_skip(index, cnt, height):
-        skip_cnt = (index - height + 4) if index + 4 > height else 0
-        return cnt >= skip_cnt and (cnt - skip_cnt) < height - 2
+    def should_skip(self, index, cnt, height, lines):
+        skip_cnt = index
+        return cnt >= skip_cnt and ((cnt - skip_cnt) * lines) < height - lines - 2
 
     def error_list(self):
-        self.write_lines(
+        self.screen_offsets[1] = self.write_lines(
             self.screen2,
             'Errors ({0} of {1})'.format(self.error_index + 1, self.error_max),
             1 if self.screens.ERRORS != self.current_screen else 3
@@ -128,18 +129,33 @@ class T8:
             cnt = 0
             self.current_error = None
             for i in errors:
+                wide = curses.COLS > 120
                 if self.error_index == cnt:
                     self.current_error = i
-                if self.should_skip(self.error_index, cnt, self.window_height):
-                    self.screen2.addstr('{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(
-                        i.file[-30:],
-                        i.line,
-                        i.message.replace("\n", "|")[-79:],
-                        i.level,
-                        i.count,
-                        Data.format_datetime(i.time),
-                        width1=30, width2=5, width3=80, width4=10, width5=5, width6=10
-                    ), curses.color_pair(2 if self.error_index == cnt else 0))
+                if self.should_skip(self.error_index, cnt, self.window_height, 1 if wide else 2):
+                    if wide:
+                        mid_width = curses.COLS - (30 + 5 + 10 + 5 + 10 + 1)
+                        self.screen2.addstr('{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(
+                            i.file[-30:],
+                            i.line,
+                            i.message.replace("\n", "|")[-mid_width:],
+                            i.level,
+                            i.count,
+                            Data.format_datetime(i.time),
+                            width1=30, width2=5, width3=mid_width, width4=10, width5=5, width6=10
+                        ), curses.color_pair(2 if self.error_index == cnt else 0))
+                    else:
+                        self.screen2.addstr('{0: <{width2}}{1: <{width3}}{2: <{width4}}{3: <{width5}}\n{4}\n'.format(
+                            "{0}:{1}".format(
+                                i.file[-30:],
+                                i.line
+                            ),
+                            i.level,
+                            i.count,
+                            Data.format_datetime(i.time),
+                            i.message.replace("\n", "|"),
+                            width2=(curses.COLS - 10 - 5 - 10 - 1), width3=10, width4=5, width5=10
+                        ), curses.color_pair(2 if self.error_index == cnt else 0))
                 cnt += 1
         else:
             self.write_lines(
@@ -149,10 +165,11 @@ class T8:
             )
 
     def error_context(self):
+
         if self.current_error:
             text = json.dumps(self.current_error.context, indent=4).split('\n')
             self.context_max = len(text)
-            self.write_lines(
+            lines = self.screen_offsets[2] = self.write_lines(
                 self.screen3,
                 'Error Context ({0} of {1})'.format(self.context_index,self.context_max),
                 1 if self.screens.CONTEXT != self.current_screen else 3
@@ -167,11 +184,11 @@ class T8:
                 cnt += max(math.ceil(len(self.current_error.message) / self.window_width), 1)
             total = self.window_height - cnt
             for i in text:
-                if self.should_skip(self.context_index + total - 4, cnt, total):
+                if self.should_skip(self.context_index, cnt, self.window_height - lines, 1):
                     self.screen3.addstr('{0}\n'.format(i))
                 cnt += max(math.ceil(len(i) / self.window_width), 1)
         else:
-            self.write_lines(
+            self.screen_offsets[2] = self.write_lines(
                 self.screen3,
                 'No error',
                 3
@@ -348,4 +365,4 @@ if __name__ == "__main__":
 	t8 = T8(data)
     except ConnectionError as err:
 	Data.invalid_connection(err, args)
-        
+

@@ -59,7 +59,7 @@ class Processor:
 if __name__ == "__main__":
     domains = args.domains.split(' ')
     bcolors.print_colour("S8: Mysql Stasher\n", bcolors.OKGREEN, bcolors.UNDERLINE)
-    bcolors.print_colour("Stashing: %s domain(s)\n", bcolors.OKGREEN)
+    bcolors.print_colour("Stashing: %s domain(s)\n" % ', '.join(domains), bcolors.OKGREEN)
     bcolors.print_colour("Press Ctrl-C to exit\n", bcolors.OKGREEN)
     try:
         data = Data(args)
