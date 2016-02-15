@@ -38,7 +38,7 @@ import ConfigParser
 from data.data import Data
 from data.subscriber import Subscriber
 from data.bcolors import bcolors
-from slacker import Slacker
+from slacker import Slacker, Error
 
 class Processor:
     def __init__(self, data):
@@ -58,7 +58,7 @@ class Domain:
         self.host = host
         self.config = config
         self.error_level = 0
-        self.slack = Slacker('xoxp-9475798162-9485747522-21503274581-17b1bf28ba')
+        self.slack = Slacker(self.config['slack_api_key'])
         pass
 
     def add_error(self, data):
@@ -72,15 +72,18 @@ class Domain:
     def alert(self):
         channels = self.config['channel']
         for channel in channels:
-            if channel[:5] == 'push:':
-                self.alert_push_notification(channel)
+            if channel[:6] == 'slack:':
+                self.alert_slack_notification(channel[6:])
             else:
-                self.alert_push_notification(channel)
+                self.alert_slack_notification(channel)
 
-    def alert_push_notification(self, channel):
+    def alert_slack_notification(self, channel):
         print "Posting message"
-        res = self.slack.chat.post_message('#error_reporting', "%s: tolerance of %d exceeded" % (self.host, self.config['tolerance']), username="ErrorBot", icon_url="http://lorempixel.com/48/48/")
-        print res.raw
+        try:
+            res = self.slack.chat.post_message('%s' % channel, "%s: tolerance of %d exceeded" % (self.host, self.config['tolerance']), username="ErrorBot", icon_url="http://lorempixel.com/48/48/")
+            print res.raw
+        except Error as error:
+            print "Error: %s -> %s" % (error.message, channel)
 
     def alert_email(self, message, channel):
         pass
@@ -104,8 +107,9 @@ class Config(ConfigParser.ConfigParser):
 
         ConfigParser.ConfigParser.__init__(self, {
             'tolerance': 1000,
+            'slack_api_key': 'xoxp-9475798162-9485747522-21503274581-17b1bf28ba',
             'channel': [
-                'push:DyhiIFDRz6Rb3j4RiqnadVdqxNhXZ7i6'
+                'slack:#error_reporting'
             ],
             'weighting_DEBUG': 0,
             'weighting_INFO': 0,
