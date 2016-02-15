@@ -38,13 +38,7 @@ import ConfigParser
 from data.data import Data
 from data.subscriber import Subscriber
 from data.bcolors import bcolors
-from pushbullet import Pushbullet
-
-# Ignore warnings for depricated ssl version
-import urllib3
-
-urllib3.disable_warnings()
-
+from slacker import Slacker
 
 class Processor:
     def __init__(self, data):
@@ -64,30 +58,29 @@ class Domain:
         self.host = host
         self.config = config
         self.error_level = 0
-        self.push_bullet = None
+        self.slack = Slacker('xoxp-9475798162-9485747522-21503274581-17b1bf28ba')
         pass
 
     def add_error(self, data):
         self.error_level += self.config['weighting_{}'.format(self.reverse_level(data['level']))]
         if self.error_level > self.config['tolerance']:
-            self.alert('')
+            self.alert()
             self.error_level = 0
         else:
             print "%s: remaining tolerance - %d" % (self.host, self.config['tolerance'] - self.error_level)
 
-    def alert(self, message):
+    def alert(self):
         channels = self.config['channel']
         for channel in channels:
             if channel[:5] == 'push:':
-                self.alert_push_notification(message, channel)
+                self.alert_push_notification(channel)
             else:
-                self.alert_push_notification(message, channel)
+                self.alert_push_notification(channel)
 
-    def alert_push_notification(self, message, channel):
-        if self.push_bullet is None:
-            self.push_bullet = Pushbullet(channel[5:])
-        push = self.push_bullet.push_note("%s: tolerance of %d exceeded" % (self.host, self.config['tolerance']), message)
-        print push
+    def alert_push_notification(self, channel):
+        print "Posting message"
+        res = self.slack.chat.post_message('#error_reporting', "%s: tolerance of %d exceeded" % (self.host, self.config['tolerance']), username="ErrorBot", icon_url="http://lorempixel.com/48/48/")
+        print res.raw
 
     def alert_email(self, message, channel):
         pass
