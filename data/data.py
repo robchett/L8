@@ -78,7 +78,7 @@ class Data:
         return ts.strftime("%Y-%m-%d")
 
     def get_time_sql(self):
-        return 'DATE(time) >= "{0}" AND DATE(time) <= "{1}"'.format(self.format_timestamp(self.start_time), self.format_timestamp(self.end_time))
+        return 'DATE(time) BETWEEN "{0}" AND "{1}"'.format(self.format_timestamp(self.start_time), self.format_timestamp(self.end_time))
 
     def get_level_sql(self):
         return 'level IN ("{0}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
