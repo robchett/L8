@@ -107,7 +107,7 @@ class Config(ConfigParser.ConfigParser):
 
         ConfigParser.ConfigParser.__init__(self, {
             'tolerance': 1000,
-            'slack_api_key': 'xoxp-9475798162-9485747522-21503274581-17b1bf28ba',
+            'slack_api_key': '<your-api-key-here>',
             'channel': [
                 'slack:#error_reporting'
             ],
