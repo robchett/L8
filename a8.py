@@ -39,43 +39,67 @@ from data.data import Data
 from data.subscriber import Subscriber
 from data.bcolors import bcolors
 from slacker import Slacker, Error
+import redis
 import json
 import time
-
-
-class Post:
-    def __init__(self):
-        self.time = time.time()
-
 
 class Processor:
     def __init__(self, data):
         self.data = data
         self.config = Config()
         self.domains = {}
+        self.redis = redis.Redis()
 
     def work(self, data):
         host = data['domain']
         if not host in self.domains:
-            self.domains[host] = Domain(host, self.config.get_host(host))
+            self.domains[host] = Domain(host, self.config.get_host(host), self.redis)
         self.domains[host].add_error(data)
 
 
 class Domain:
-    def __init__(self, host, config):
+    def __init__(self, host, config, redis):
         self.host = host
+        self.redis = redis  # type: redis.Redis
         self.config = config
         self.error_level = 0
         self.slack = Slacker(self.config['slack_api_key'])
-        self.posts = {}
+
         self.distribution = {}
+        self.posts = {}
         self.skipped_posts = 0
+
+        try:
+            res = self.get_value('posts', '{}')
+            self.posts = json.loads(res.replace("'", '"'))
+        except ValueError:
+            bcolors.print_colour("Invalid cache read: posts", bcolors.WARNING, bcolors.UNDERLINE)
+            print res
+            self.reset_posts()
+        try:
+            res = self.get_value('distribution', '{}')
+            self.distribution = json.loads(res.replace("'", '"'))
+        except ValueError:
+            bcolors.print_colour("Invalid cache read: distribution", bcolors.WARNING, bcolors.UNDERLINE)
+            print res
+            self.reset_distribution()
+        self.skipped_posts = int(self.get_value('skipped_posts', 0))
+
+        pass
+
+    def get_value(self, key, default):
+        value = self.redis.get('.a8.%s.%s' % (self.host, key))
+        if value is None:
+            return default
+        return value
+
+    def set_value(self, key, value):
+        self.redis.set('.a8.%s.%s' % (self.host, key), value)
         pass
 
     def add_error(self, data):
-
         level = self.reverse_level(data['level'])
-        self.distribution[level] = self.distribution.get(level, 0) + 1
+        self.incr_distribution(level)
 
         self.error_level += int(self.config['weighting_{}'.format(level)])
         if self.error_level > int(self.config['tolerance']):
@@ -84,38 +108,53 @@ class Domain:
         else:
             print "%s: remaining tolerance - %d" % (self.host, int(self.config['tolerance']) - self.error_level)
 
-    def alert(self):
+    def skip(self):
+        self.skipped_posts += 1
+        self.set_value('skipped_posts', self.skipped_posts)
 
+    def reset_skip(self):
+        self.skipped_posts = 0
+        self.set_value('skipped_posts', self.skipped_posts)
+
+    def incr_distribution(self, level):
+        self.distribution[level] = self.distribution.get(level, 0) + 1
+        self.set_value('distribution', json.dumps(self.distribution))
+        pass
+
+    def reset_distribution(self):
+        self.distribution = {}
+        self.set_value('distribution', self.distribution)
+
+    def add_post(self):
+        self.posts.append({'time': time.time()})
+        self.set_value('posts', json.dumps(self.posts))
+
+    def reset_posts(self):
+        self.posts = {}
+        self.set_value('posts', self.posts)
+
+    def alert(self):
         posts_within_1min = 0
         posts_within_5min = 0
         posts_within_15min = 0
         posts_within_hour = 0
         for post in self.posts:
-            if time.time() - post.time < 60:
+            if time.time() - post.get('time') < 60:
                 posts_within_1min += 1
-            if time.time() - post.time < 60 * 5:
+            if time.time() - post.get('time') < 60 * 5:
                 posts_within_15min += 1
-            if time.time() - post.time < 60 * 15:
+            if time.time() - post.get('time') < 60 * 15:
                 posts_within_5min += 1
-            if time.time() - post.time < 60 * 60:
+            if time.time() - post.get('time') < 60 * 60:
                 posts_within_hour += 1
 
-        self.posts = [x for x in self.posts if x.time >= 60 * 60]
+        self.posts = [x for x in self.posts if x.get('time') >= 60 * 60]
 
-        if posts_within_1min > 1:
-            self.skipped_posts += 1
-            return False
-        if posts_within_5min > 2:
-            self.skipped_posts += 1
-            return False
-        if posts_within_15min > 5:
-            self.skipped_posts += 1
-            return False
-        if posts_within_hour > 10:
-            self.skipped_posts += 1
+        if posts_within_1min > 1 or posts_within_5min > 2 or posts_within_15min > 5 or posts_within_hour > 10:
+            self.skip()
             return False
 
-        self.posts.append(Post())
+        self.add_post()
 
         channels = self.config['channels']
         if isinstance(channels, basestring):
@@ -128,8 +167,8 @@ class Domain:
                 # Other channels we might want to use in the future.
                 pass
 
-        self.skipped_posts = 0
-        self.distribution = {}
+        self.reset_skip()
+        self.reset_distribution()
 
     def alert_slack_notification(self, channel, skipped, distribution):
         bcolors.print_colour("Posting message to %s\n" % channel, bcolors.WARNING, bcolors.BOLD)
