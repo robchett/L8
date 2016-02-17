@@ -39,6 +39,14 @@ from data.data import Data
 from data.subscriber import Subscriber
 from data.bcolors import bcolors
 from slacker import Slacker, Error
+import json
+import time
+
+
+class Post:
+    def __init__(self):
+        self.time = time.time()
+
 
 class Processor:
     def __init__(self, data):
@@ -59,31 +67,83 @@ class Domain:
         self.config = config
         self.error_level = 0
         self.slack = Slacker(self.config['slack_api_key'])
+        self.posts = {}
+        self.distribution = {}
+        self.skipped_posts = 0
         pass
 
     def add_error(self, data):
-        self.error_level += self.config['weighting_{}'.format(self.reverse_level(data['level']))]
-        if self.error_level > self.config['tolerance']:
+
+        level = self.reverse_level(data['level'])
+        self.distribution[level] = self.distribution.get(level, 0) + 1
+
+        self.error_level += int(self.config['weighting_{}'.format(level)])
+        if self.error_level > int(self.config['tolerance']):
             self.alert()
             self.error_level = 0
         else:
-            print "%s: remaining tolerance - %d" % (self.host, self.config['tolerance'] - self.error_level)
+            print "%s: remaining tolerance - %d" % (self.host, int(self.config['tolerance']) - self.error_level)
 
     def alert(self):
-        channels = self.config['channel']
+
+        posts_within_1min = 0
+        posts_within_5min = 0
+        posts_within_15min = 0
+        posts_within_hour = 0
+        for post in self.posts:
+            if time.time() - post.time < 60:
+                posts_within_1min += 1
+            if time.time() - post.time < 60 * 5:
+                posts_within_15min += 1
+            if time.time() - post.time < 60 * 15:
+                posts_within_5min += 1
+            if time.time() - post.time < 60 * 60:
+                posts_within_hour += 1
+
+        self.posts = [x for x in self.posts if x.time >= 60 * 60]
+
+        if posts_within_1min > 1:
+            self.skipped_posts += 1
+            return False
+        if posts_within_5min > 2:
+            self.skipped_posts += 1
+            return False
+        if posts_within_15min > 5:
+            self.skipped_posts += 1
+            return False
+        if posts_within_hour > 10:
+            self.skipped_posts += 1
+            return False
+
+        self.posts.append(Post())
+
+        channels = self.config['channels']
+        if isinstance(channels, basestring):
+            channels = json.loads(channels.replace("'", '"'))
+
         for channel in channels:
             if channel[:6] == 'slack:':
-                self.alert_slack_notification(channel[6:])
+                self.alert_slack_notification(channel[6:], self.skipped_posts, self.distribution)
             else:
-                self.alert_slack_notification(channel)
+                # Other channels we might want to use in the future.
+                pass
 
-    def alert_slack_notification(self, channel):
-        print "Posting message"
+        self.skipped_posts = 0
+        self.distribution = {}
+
+    def alert_slack_notification(self, channel, skipped, distribution):
+        bcolors.print_colour("Posting message to %s\n" % channel, bcolors.WARNING, bcolors.BOLD)
         try:
-            res = self.slack.chat.post_message('%s' % channel, "%s: tolerance of %d exceeded" % (self.host, self.config['tolerance']), username="ErrorBot", icon_url="http://lorempixel.com/48/48/")
-            print res.raw
+            message = "%s: tolerance of %d exceeded" % (self.host, int(self.config['tolerance']))
+            if skipped:
+                message = "%s, %d skipped" % (message, skipped)
+            distribution_list = []
+            for key, value in distribution.iteritems():
+                distribution_list.append({'title': key, 'value': value, "short": True})
+            attachments = json.dumps([{'fields': distribution_list}])
+            res = self.slack.chat.post_message('%s' % channel, message, username="ErrorBot", icon_url="http://lorempixel.com/48/48/", attachments=attachments)
         except Error as error:
-            print "Error: %s -> %s" % (error.message, channel)
+            bcolors.print_colour("Error: %s -> %s\n" % (error.message, channel), bcolors.FAIL)
 
     def alert_email(self, message, channel):
         pass
@@ -108,7 +168,7 @@ class Config(ConfigParser.ConfigParser):
         ConfigParser.ConfigParser.__init__(self, {
             'tolerance': 1000,
             'slack_api_key': '<your-api-key-here>',
-            'channel': [
+            'channels': [
                 'slack:#error_reporting'
             ],
             'weighting_DEBUG': 0,
@@ -127,6 +187,8 @@ class Config(ConfigParser.ConfigParser):
             self.read(conf_path)
         else:
             self.add_section('base')
+            self.write(open(conf_path, 'w'))
+            bcolors.print_colour("Writing default config to ~/.a8\n", bcolors.OKBLUE, bcolors.BOLD)
 
     def check_section(self, section):
         if not self.has_section(section):
