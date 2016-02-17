@@ -84,6 +84,7 @@ class Domain:
             print res
             self.reset_distribution()
         self.skipped_posts = int(self.get_value('skipped_posts', 0))
+        self.error_level = int(self.get_value('error_level', 0))
 
         pass
 
@@ -101,10 +102,10 @@ class Domain:
         level = self.reverse_level(data['level'])
         self.incr_distribution(level)
 
-        self.error_level += int(self.config['weighting_{}'.format(level)])
+        self.incr_error_level(int(self.config['weighting_{}'.format(level)]))
         if self.error_level > int(self.config['tolerance']):
             self.alert()
-            self.error_level = 0
+            self.reset_error_level()
         else:
             print "%s: remaining tolerance - %d" % (self.host, int(self.config['tolerance']) - self.error_level)
 
@@ -132,6 +133,14 @@ class Domain:
     def reset_posts(self):
         self.posts = {}
         self.set_value('posts', self.posts)
+
+    def incr_error_level(self, value):
+        self.error_level += value
+        self.set_value('error_level', self.error_level)
+
+    def reset_error_level(self):
+        self.error_level = 0
+        self.set_value('error_level', self.error_level)
 
     def alert(self):
         posts_within_1min = 0
