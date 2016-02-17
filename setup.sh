@@ -23,3 +23,5 @@ SERVICE
 create_service s8 `pwd`
 
 create_service a8 `pwd`
+
+create_service p8 `pwd`
