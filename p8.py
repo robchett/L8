@@ -62,7 +62,7 @@ class Processor:
 if __name__ == "__main__":
     bcolors.print_colour("P8: L8 proxy\n", bcolors.OKGREEN, bcolors.UNDERLINE)
     bcolors.print_colour('Proxy endpoint: %s:%s\n' % (args.host, args.port), bcolors.OKGREEN)
-    bcolors.print_colour("Press Ctrl-C to exit", bcolors.OKGREEN)
+    bcolors.print_colour("Press Ctrl-C to exit\n", bcolors.OKGREEN)
 
     try:
         c = Processor(args.subscription)
@@ -70,6 +70,6 @@ if __name__ == "__main__":
         s.work_raw(c.work)
     except redis.ConnectionError as err:
         bcolors.print_colour('Connection error\n', bcolors.FAIL, bcolors.UNDERLINE)
-        bcolors.print_colour(err, bcolors.FAIL)
+        bcolors.print_colour(str(err), bcolors.FAIL)
     except (KeyboardInterrupt, SystemExit):
         pass
