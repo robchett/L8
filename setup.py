@@ -4,6 +4,6 @@ setup(
     name="L8 Tools",
     version="1.0",
     install_requires=[
-        "pymysql", "slacker"
+        "pymysql", "slacker", 'redis'
     ]
 )
