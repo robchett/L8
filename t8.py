@@ -129,33 +129,36 @@ class T8:
             cnt = 0
             self.current_error = None
             for i in errors:
-                wide = curses.COLS > 120
-                if self.error_index == cnt:
-                    self.current_error = i
-                if self.should_skip(self.error_index, cnt, self.window_height, 1 if wide else 2):
-                    if wide:
-                        mid_width = curses.COLS - (30 + 5 + 10 + 5 + 10 + 1)
-                        self.screen2.addstr('{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(
-                            i.file[-30:],
-                            i.line,
-                            i.message.replace("\n", "|")[-mid_width:],
-                            i.level,
-                            i.count,
-                            Data.format_datetime(i.time),
-                            width1=30, width2=5, width3=mid_width, width4=10, width5=5, width6=10
-                        ), curses.color_pair(2 if self.error_index == cnt else 0))
-                    else:
-                        self.screen2.addstr('{0: <{width2}}{1: <{width3}}{2: <{width4}}{3: <{width5}}\n{4}\n'.format(
-                            "{0}:{1}".format(
+                try:
+                    wide = curses.COLS > 120
+                    if self.error_index == cnt:
+                        self.current_error = i
+                    if self.should_skip(self.error_index, cnt, self.window_height, 1 if wide else 2):
+                        if wide:
+                            mid_width = curses.COLS - (30 + 5 + 10 + 5 + 10 + 1)
+                            self.screen2.addstr('{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}'.format(
                                 i.file[-30:],
-                                i.line
-                            ),
-                            i.level,
-                            i.count,
-                            Data.format_datetime(i.time),
-                            i.message.replace("\n", "|"),
-                            width2=(curses.COLS - 10 - 5 - 10 - 1), width3=10, width4=5, width5=10
-                        ), curses.color_pair(2 if self.error_index == cnt else 0))
+                                i.line,
+                                i.message.replace("\n", "|")[-mid_width:],
+                                i.level,
+                                i.count,
+                                Data.format_datetime(i.time),
+                                width1=30, width2=5, width3=mid_width, width4=10, width5=5, width6=10
+                            ), curses.color_pair(2 if self.error_index == cnt else 0))
+                        else:
+                            self.screen2.addstr('{0: <{width2}}{1: <{width3}}{2: <{width4}}{3: <{width5}}\n{4}\n'.format(
+                                "{0}:{1}".format(
+                                    i.file[-30:],
+                                    i.line
+                                ),
+                                i.level,
+                                i.count,
+                                Data.format_datetime(i.time),
+                                i.message.replace("\n", "|"),
+                                width2=(curses.COLS - 10 - 5 - 10 - 1), width3=10, width4=5, width5=10
+                            ), curses.color_pair(2 if self.error_index == cnt else 0))
+                except curses.error as e:
+                    pass
                 cnt += 1
         else:
             self.write_lines(
