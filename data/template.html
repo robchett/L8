@@ -69,6 +69,7 @@
 		      <th>Message</th>
 		      <th ng-click="setSort('count')">Count <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': sortBy == '-count', 'glyphicon-triangle-top': sortBy == 'count'}"></span></th>
 		      <th ng-click="setSort('time')">Time <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': sortBy == 'time', 'glyphicon-triangle-top': sortBy == '-time'}"></span></th>
+		      <th>&nbsp;</th>
 		    </tr>
 		  </thead>
 		  <tbody>
@@ -80,6 +81,7 @@
 		      </td>
 		      <td class="p10">{{error.count}}</td>
 		      <td class="p10">{{error.ptime}}</td>
+		      <td><button href="#" ng-click="deleteError(error.id)" ng-class="{disabled: deleting[error.id] == true}" class="btn btn-default" type="button">Delete</button></td>
 		    </tr>
 		  </tbody>
 		</table>
@@ -120,12 +122,13 @@
 	 $scope.errors = [];
 	 $scope.errorLevels = [];
 	 $scope.errorLevel = '';
-	 $scope.selectedLevels = [];//['DEBUG', 'INFO', 'NOTICE', 'ALERT'];
+	 $scope.selectedLevels = [];
 	 $scope.refreshErrors = true;
 	 $scope.lastHost = '';
 	 $scope.sortBy = '-time';
 	 $scope.groupErrors = true;
 	 $scope.selectedError = '';
+	 $scope.deleting = [];
 	 var domainHash = '';
 	 var errorHash = '';
 
@@ -155,6 +158,21 @@
 	       errorHash = data.hash
 	       $scope.errors = data.errors;
 	     }
+	   });
+	 }
+
+	 $scope.deleteError = function(id) {
+	   $scope.deleting[id] = true;
+	   if ($scope.groupErrors) {
+	     url = '/api/v1.0/delete/group/' + id + '/';
+	   } else {
+	     url = '/api/v1.0/delete/' + id + '/';
+	   }
+	   console.log(url);
+	   $http.get(url).success(function(data) {
+	     $scope.getErrors($scope.lastHost);
+	     getDomains();
+	     $scope.deleting[id] = false;
 	   });
 	 }
 
