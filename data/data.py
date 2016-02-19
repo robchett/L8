@@ -121,6 +121,15 @@ class Data:
                 res.append(self.Error(record[8], record[0], record[1], record[2], record[3], record[4], record[5], record[6], record[7], record[9]))
             return res
 
+    def get_error(self, id):
+        with self.mysql.cursor() as cursor:
+            cursor.execute('SELECT filename, line, message, level, source, context, 1 as count, time, id, domain FROM `messages` WHERE id = %s' % id)
+            record = cursor.fetchone()
+            if not record:
+                raise LookupError("Error record not found")
+
+            return self.Error(record[8], record[0], record[1], record[2], record[3], record[4], record[5], record[6], record[7], record[9])
+            
     def delete_type(self, error):
         with self.mysql.cursor() as cursor:
             sql = "DELETE FROM messages WHERE line = %s AND filename = %s AND domain = %s"
