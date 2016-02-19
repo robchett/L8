@@ -40,11 +40,16 @@ import json
 import curses
 from curses import wrapper
 import sys
+import _mysql
+import _mysql_exceptions
+import base64
 import time
 
 from data.data import Data
-from data.data import ConnectionError
-from data.config import args
+from data.conf import args
+
+if args.method in ['domain']:
+    parser.error('A domain is required')
 
 class T8:
     class screens:
@@ -77,7 +82,6 @@ class T8:
         self.screen1 = None
         self.screen2 = None
         self.screen3 = None
-        self.stdscr = None
 
         # Create looping function
         try:
@@ -96,13 +100,19 @@ class T8:
 
 
     def domain_list(self):
+        self.clear()
         domains = self.data.domains()
         self.domain_max = len(domains)
+<<<<<<< HEAD
         self.screen_offsets[0] = self.write_lines(
             self.screen1,
             'Domains ({0} of {1}) {2} {3}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()),
             1 if self.screens.DOMAINS != self.current_screen else 3
         )
+=======
+        self.screen1.addstr('{0: <{width}}'.format('Domains ({} of {}) {} {}'.format(self.domain_index + 1, self.domain_max, self.data.get_level_sql(), self.data.get_time_sql()), width=curses.COLS),
+                            curses.color_pair(1 if self.screens.DOMAINS != self.current_screen else 3))
+>>>>>>> Moved the config/arg parser into it's own file and improved some imports
         cnt = 0
         self.current_domain = None
         if self.domain_max:
@@ -112,7 +122,10 @@ class T8:
                 if self.should_skip(self.domain_index, cnt, self.window_height, 1):
                     self.screen1.addstr('{0: <{width1}}{1: >{width2}}'.format(i.host, i.error_count, width1=curses.COLS - 10, width2=10), curses.color_pair(2 if self.domain_index == cnt else 0))
                 cnt += 1
+            self.error_list()
+        self.refresh()
 
+<<<<<<< HEAD
     def should_skip(self, index, cnt, height, lines):
         skip_cnt = index
         return cnt >= skip_cnt and ((cnt - skip_cnt) * lines) < height - lines - 2
@@ -123,12 +136,21 @@ class T8:
             'Errors ({0} of {1})'.format(self.error_index + 1, self.error_max),
             1 if self.screens.ERRORS != self.current_screen else 3
         )
+=======
+    def should_skip(self, index, cnt, height):
+        skip_cnt = (index - height + 4) if index + 4 > height else 0
+        return cnt >= skip_cnt and (cnt - skip_cnt) < height - 2
+
+    def error_list(self):
+        self.screen2.addstr('{0: <{width}}'.format('Errors ({} of {})'.format(self.error_index + 1, self.error_max), width=curses.COLS), curses.color_pair(1 if self.screens.ERRORS != self.current_screen else 3))
+>>>>>>> Moved the config/arg parser into it's own file and improved some imports
         if self.current_domain:
             errors = self.data.errors(self.current_domain.host, self.error_mode)
             self.error_max = len(errors)
             cnt = 0
             self.current_error = None
             for i in errors:
+<<<<<<< HEAD
                 try:
                     wide = curses.COLS > 120
                     if self.error_index == cnt:
@@ -159,7 +181,17 @@ class T8:
                             ), curses.color_pair(2 if self.error_index == cnt else 0))
                 except curses.error as e:
                     pass
+=======
+                if self.error_index == cnt:
+                    self.current_error = i
+                if self.should_skip(self.error_index, cnt, self.window_height):
+                    self.screen2.addstr(
+                        '{0: <{width1}}:{1: <{width2}}{2: <{width3}}{3: <{width4}}{4: <{width5}}{5: <{width6}}\n'.format(i.file[-30:], i.line, i.message.replace("\n", "|")[-79:], i.level, i.count, i.time, width1=30, width2=5, width3=80,
+                                                                                                                         width4=10, width5=5, width6=10), curses.color_pair(2 if self.error_index == cnt else 0))
+>>>>>>> Moved the config/arg parser into it's own file and improved some imports
                 cnt += 1
+
+            self.error_context()
         else:
             self.write_lines(
                 self.screen2,
@@ -170,8 +202,9 @@ class T8:
     def error_context(self):
 
         if self.current_error:
-            text = json.dumps(self.current_error.context, indent=4).split('\n')
+            text = json.dumps(json.loads(base64.b64decode(self.current_error.context)), indent=4).split('\n')
             self.context_max = len(text)
+<<<<<<< HEAD
             lines = self.screen_offsets[2] = self.write_lines(
                 self.screen3,
                 'Error Context ({0} of {1})'.format(self.context_index,self.context_max),
@@ -189,6 +222,17 @@ class T8:
             for i in text:
                 if self.should_skip(self.context_index, cnt, self.window_height - lines, 1):
                     self.screen3.addstr('{0}\n'.format(i))
+=======
+            self.screen3.addstr('{0: <{width}}'.format('Error Context ({} of {})'.format(self.context_index, self.context_max), width=curses.COLS), curses.color_pair(1 if self.screens.CONTEXT != self.current_screen else 3))
+            cnt = 0
+            for i in self.current_error.message.split('\n'):
+                self.screen3.addstr('{0: <{width}}'.format('{}'.format(i), width=curses.COLS), curses.color_pair(4))
+                cnt += max(math.ceil(len(self.current_error.message) / self.window_width), 1)
+            total = self.window_height - cnt
+            for i in text:
+                if self.should_skip(self.context_index + total - 4, cnt, total):
+                    self.screen3.addstr('{}\n'.format(i))
+>>>>>>> Moved the config/arg parser into it's own file and improved some imports
                 cnt += max(math.ceil(len(i) / self.window_width), 1)
         else:
             self.screen_offsets[2] = self.write_lines(
@@ -198,7 +242,7 @@ class T8:
             )
 
     def get_help_screen(self):
-        self.clear(True, True, True)
+        self.clear()
         self.screen1.addstr('\
 Key commands\n\
     tab : move between windows \n\
@@ -209,7 +253,7 @@ Key commands\n\
     o   : Open the options screen'
                             )
 
-        self.refresh(True, True, True)
+        self.refresh()
 
         while True:
             c = self.stdscr.getch()
@@ -219,22 +263,22 @@ Key commands\n\
 
     def get_options_screen(self):
         while True:
-            self.clear(True, True, True)
+            self.clear()
             cnt = 0
             self.screen1.addstr('Options\n')
             self.screen1.addstr('Dates\n')
-            self.screen1.addstr('\tStart date: {0}\n'.format(self.data.format_timestamp(self.data.start_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            self.screen1.addstr('\tStart date: {}\n'.format(self.data.format_time(self.data.start_time)), curses.color_pair(2 if self.options_index == cnt else 0))
             cnt += 1
-            self.screen1.addstr('\tEnd date  : {0}\n'.format(self.data.format_timestamp(self.data.end_time)), curses.color_pair(2 if self.options_index == cnt else 0))
+            self.screen1.addstr('\tEnd date  : {}\n'.format(self.data.format_time(self.data.end_time)), curses.color_pair(2 if self.options_index == cnt else 0))
             cnt += 1
             self.screen1.addstr('\n')
             self.screen1.addstr('Error levels\n')
 
             for i in self.data.levels.keys:
-                self.screen1.addstr('\t[{0}] {1}\n'.format('x' if self.data.error_levels[cnt - 2] else ' ', i), curses.color_pair(2 if self.options_index == cnt else 0))
+                self.screen1.addstr('\t[{}] {}\n'.format('x' if self.data.error_levels[cnt - 2] else ' ', i), curses.color_pair(2 if self.options_index == cnt else 0))
                 cnt += 1
 
-            self.refresh(True, True, True)
+            self.refresh()
             c = self.stdscr.getch()
             if c == ord('q'):
                 return
@@ -243,8 +287,7 @@ Key commands\n\
             elif c == curses.KEY_DOWN:
                 self.options_index = min(self.options_index + 1, cnt - 1)
             elif c == ord(' '):
-                if self.options_index >= 2:
-                    self.data.error_levels[self.options_index - 2] = self.data.error_levels[self.options_index - 2] = not self.data.error_levels[self.options_index - 2]
+                self.data.error_levels[self.options_index - 2] = self.data.error_levels[self.options_index - 2] = not self.data.error_levels[self.options_index - 2]
             elif c == curses.KEY_LEFT:
                 if self.options_index == 0:
                     self.data.start_time -= 24 * 60 * 60
@@ -257,33 +300,16 @@ Key commands\n\
                 elif self.options_index == 1:
                     self.data.end_time += 24 * 60 * 60
 
-    def refresh(self, screen1, screen2, screen3):
-        if screen1:
-            self.screen1.noutrefresh()
-        if screen2:
-            self.screen2.noutrefresh()
-        if screen3:
-            self.screen3.noutrefresh()
+    def refresh(self):
+        self.screen1.noutrefresh()
+        self.screen2.noutrefresh()
+        self.screen3.noutrefresh()
         curses.doupdate()
 
-    def clear(self, screen1, screen2, screen3):
-        if screen1:
-            self.screen1.clear()
-        if screen2:
-            self.screen2.clear()
-        if screen3:
-            self.screen3.clear()
-
-    def redraw(self, level):
-        self.clear(level <= self.screens.DOMAINS, level <= self.screens.ERRORS, level <= self.screens.CONTEXT)
-        if level <=  self.screens.DOMAINS:
-            self.domain_list()
-        if level <= self.screens.ERRORS:
-            self.error_list()
-        if level <= self.screens.CONTEXT:
-            self.error_context()
-        self.refresh(level <= self.screens.DOMAINS, level <= self.screens.ERRORS, level <= self.screens.CONTEXT)
-
+    def clear(self):
+        self.screen1.clear()
+        self.screen2.clear()
+        self.screen3.clear()
 
     def init_windows(self, stdscr):
         # Disable echo of key presses
@@ -309,9 +335,8 @@ Key commands\n\
         self.screen2 = curses.newwin(self.window_height, self.window_width, self.window_height, 0)
         self.screen3 = curses.newwin(self.window_height, self.window_width, self.window_height * 2, 0)
 
-        stdscr.refresh()
-
-        self.redraw(self.screens.DOMAINS)
+        self.domain_list()
+        self.refresh()
 
         while True:
             c = self.stdscr.getch()
@@ -325,7 +350,7 @@ Key commands\n\
                     self.context_index = 0
                 elif self.current_screen == self.screens.CONTEXT:
                     self.context_index = max(self.context_index - 1, 0)
-                self.redraw(self.current_screen)
+                self.domain_list()
             elif c == curses.KEY_DOWN:
                 if self.current_screen == self.screens.DOMAINS:
                     self.domain_index = min(self.domain_index + 1, self.domain_max - 1)
@@ -336,36 +361,32 @@ Key commands\n\
                     self.context_index = 0
                 elif self.current_screen == self.screens.CONTEXT:
                     self.context_index = min(self.context_index + 1, self.context_max - 1)
-                self.redraw(self.current_screen)
+                self.domain_list()
             elif c == ord('a'):
                 self.error_mode = data.mode.totals if self.error_mode == data.mode.latest else data.mode.latest
-                self.redraw(self.screens.ERRORS)
-            elif c == curses.KEY_DC:
-                if self.current_screen == self.screens.ERRORS:
-                    if self.error_mode == data.mode.latest:
-                        self.data.delete_entry(self.current_error)
-                    else:
-                        self.data.delete_type(self.current_error)
-                self.current_error = None
-                self.context_index = 0
-                self.redraw(self.screens.ERRORS)
+                self.domain_list()
             elif c == ord('\t'):
                 self.current_screen = (self.current_screen + 1) if self.current_screen != self.screens.CONTEXT else self.screens.DOMAINS
-                self.redraw(self.screens.DOMAINS)
+                self.domain_list()
             elif c == ord('h'):
                 self.get_help_screen()
-                self.redraw(self.screens.DOMAINS)
+                self.domain_list()
             elif c == ord('o'):
                 self.get_options_screen()
-                self.redraw(self.screens.DOMAINS)
+                self.domain_list()
             elif c == ord('q'):
                 return True
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     try:
         data = Data(args)
 	t8 = T8(data)
     except ConnectionError as err:
 	Data.invalid_connection(err, args)
 
+=======
+    data = Data(args)
+    t8 = T8(data)
+>>>>>>> Moved the config/arg parser into it's own file and improved some imports

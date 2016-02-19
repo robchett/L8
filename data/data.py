@@ -49,7 +49,6 @@ import pymysql.err as mysql_exceptions
 
 mysql.install_as_MySQLdb()
 
-
 class Data:
     def __init__(self, args):
         self.start_time = time.time() - (7 * 24 * 60 * 60)
@@ -69,6 +68,9 @@ class Data:
         except (mysql_exceptions.OperationalError, mysql_exceptions.ProgrammingError) as err:
             raise ConnectionError(err)
 
+    def __del__(self):
+        self.mysql.close()
+
     @staticmethod
     def format_timestamp(ts):
         return time.strftime('%Y-%m-%d', time.gmtime(ts))
@@ -78,7 +80,7 @@ class Data:
         return ts.strftime("%Y-%m-%d")
 
     def get_time_sql(self):
-        return 'DATE(time) BETWEEN "{0}" AND "{1}"'.format(self.format_timestamp(self.start_time), self.format_timestamp(self.end_time))
+        return 'DATE(time) >= "{0}" AND DATE(time) <= "{1}"'.format(self.format_timestamp(self.start_time), self.format_timestamp(self.end_time))
 
     def get_level_sql(self):
         return 'level IN ("{0}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
@@ -119,6 +121,15 @@ class Data:
                 res.append(self.Error(record[8], record[0], record[1], record[2], record[3], record[4], record[5], record[6], record[7], record[9]))
             return res
 
+    def get_error(self, id):
+        with self.mysql.cursor() as cursor:
+            cursor.execute('SELECT filename, line, message, level, source, context, 1 as count, time, id, domain FROM `messages` WHERE id = %s' % id)
+            record = cursor.fetchone()
+            if not record:
+                raise LookupError("Error record not found")
+
+            return self.Error(record[8], record[0], record[1], record[2], record[3], record[4], record[5], record[6], record[7], record[9])
+            
     def delete_type(self, error):
         with self.mysql.cursor() as cursor:
             sql = "DELETE FROM messages WHERE line = %s AND filename = %s AND domain = %s"
@@ -140,7 +151,6 @@ class Data:
         sys.stdout.write('%s%s%s%s\n' % (bcolors.FAIL, bcolors.UNDERLINE, "MYSQL error: ", bcolors.ENDC))
         sys.stdout.write('%s%s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
         sys.stdout.write('%sCREATE DATABASE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
-	sys.stdout.write('%sUSE %s;%s\n' % (bcolors.WARNING, args.database, bcolors.ENDC))
         sys.stdout.write('%s\
 CREATE TABLE `messages` (\n\
   `id` int(11) NOT NULL AUTO_INCREMENT,\n\
@@ -151,8 +161,7 @@ CREATE TABLE `messages` (\n\
   `message` text,\n\
   `filename` varchar(255) DEFAULT NULL,\n\
   `line` int(10) DEFAULT NULL,\n\
-  `context` text,\n\
-  PRIMARY KEY (id)\n\
+  `context` text\n\
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;%s\n' % (bcolors.WARNING, bcolors.ENDC))
         sys.stdout.write('%sCREATE USER "%s"@"%s" IDENTIFIED BY "%s";%s\n' % (
             bcolors.WARNING, args.username, args.host, args.password, bcolors.ENDC))
@@ -221,7 +230,7 @@ CREATE TABLE `messages` (\n\
             self.id = id
             self.time = time
             self.count = count
-            self.context = json.loads(base64.b64decode(context))
+            self.context = context
             self.source = source
             self.level = level
             self.message = message

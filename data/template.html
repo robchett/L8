@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
+      <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.5/cerulean/bootstrap.min.css" rel="stylesheet">
+      <style>
+       button{outline: none !important;}
+      </style>
+      <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/ngStorage/0.3.6/ngStorage.min.js">script></script>
+      <title>W8</title>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div ng-app="w8">
+	<div ng-controller="DomainCtrl">
+	  <div class="row">
+	    <div class="col-sm-6">
+	      <h1>W8 Error Listings</h1>
+	    </div>
+	  </div>
+	  <div class="row">
+	    <div id="domainList" class="col-lg-3">
+	      <div class="panel panel-default">
+		<div class="panel-heading">Domains</div>
+		<table class="table table-hover table-striped">
+		  <thead>
+		    <tr>
+		      <th>Domain</th>
+		      <th>Errors</th>
+		    </tr>
+		  </thead>
+		  <tbody>
+		    <tr ng-repeat="domain in domains"  ng-class="{info: $storage.lastHost == domain.host}">
+		      <td ng-click="getErrors(domain.host)">{{domain.host}}</td>
+		      <td>{{domain.error_count}}</td>
+		    </tr>
+		  </tbody>
+		</table>
+	      </div>
+	    </div>
+	    <div id="errorList" class="col-lg-9">
+	      <div class="panel panel-default">
+		<div class="panel-heading">Errors</div>								
+		<div class="panel-body">
+		  <div class="btn-toolbar">
+		    <div class="btn-group">
+		      <button class="btn btn-default" type="button" ng-class="{active: selectedLevels.length == errorLevels.length}" ng-click="setLevelAll()">All</button>
+		      <button ng-repeat="errorType in errorLevels" class="btn btn-default" type="button" ng-class="{active: selectedLevels.indexOf(errorType) != -1}" ng-click="setLevel(errorType)">{{errorType}}</button>
+		    </div>
+		    <div class="btn-group">
+		      <button class="btn btn-default" type="button" ng-class="{active: $storage.refreshErrors == true}"  ng-click="toggleErrorRefresh()">Auto Refresh</button>
+		      <button class="btn btn-default" type="button" ng-class="{disabled: $storage.lastHost == '' || $storage.refreshErrors == true}"  ng-click="getErrors($storage.lastHost)">Refresh</button>
+		      <button class="btn btn-default" type="button" ng-class="{active: $storage.groupErrors == true}"  ng-click="toggleGroupErrors()">Group Errors</button>
+		    </div>
+		    <form class="form-inline pull-right">
+		      <div class="form-group">
+			<div class="input-group">
+			  <input id="search" type="text" class="form-control" ng-model="searchText" placeholder="Search errors..." />
+			</div>
+		      </div>
+		    </form>
+		  </div>
+		</div>
+		<table class="table table-hover table-striped">
+		  <thead>
+		    <tr>
+		      <th>Level</th>
+		      <th>Message</th>
+		      <th ng-click="setSort('count')">Count <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': $storage.sortBy == '-count', 'glyphicon-triangle-top': $storage.sortBy == 'count'}"></span></th>
+		      <th ng-click="setSort('time')">Time <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': $storage.sortBy == 'time', 'glyphicon-triangle-top': $storage.sortBy == '-time'}"></span></th>
+		      <th>&nbsp;</th>
+		    </tr>
+		  </thead>
+		  <tbody>
+		    <tr ng-repeat="error in errors | filter:searchText | inArray:selectedLevels:'level' | orderBy: $storage.sortBy"  ng-click="selectedError = error.id">
+		      <td class="p10">{{error.level}}</td>
+		      <td>
+			<pre>{{ error.message | limitTo : 125 : 0 }}</pre>
+			<pre>{{ error.file }} : {{ error.line }}</pre>
+		      </td>
+		      <td class="p10">{{error.count}}</td>
+		      <td class="p10">{{error.ptime}}</td>
+		      <td><button href="#" ng-click="deleteError(error.id)" ng-class="{disabled: deleting[error.id] == true}" class="btn btn-default" type="button">Delete</button></td>
+		    </tr>
+		  </tbody>
+		</table>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+      </div>
+      <script>
+       angular.module('inArray', []).filter('inArray', function($filter){
+	 return function(list, arrayFilter, element){
+	   if(arrayFilter){
+	     return $filter("filter")(list, function(listItem){
+	       return arrayFilter.indexOf(listItem[element]) != -1;
+	     });
+	   }
+	 };
+       }); 
+       
+       var app = angular.module('w8', ['inArray', 'ngStorage']);
+
+       angular.module('w8').filter('inArray', function($filter){
+	 return function(list, arrayFilter, element){
+	   if(arrayFilter){
+	     return $filter("filter")(list, function(listItem){
+	       if(arrayFilter.length > 0) {
+		 return arrayFilter.indexOf(listItem[element]) != -1;
+	       } else {
+		 return false;
+	       }
+	     });
+	   }
+	 };
+       });
+
+       app.controller('DomainCtrl', function($scope, $http, $localStorage) {
+         $scope.$storage = $localStorage.$default({
+           lastHost: '',
+	   sortBy: '-time',
+           groupErrors: true,
+           refreshErrors: true
+         });
+	 $scope.domains = [];
+	 $scope.errors = [];
+	 $scope.errorLevels = [];
+	 $scope.errorLevel = '';
+	 $scope.selectedLevels = [];
+	 $scope.selectedError = '';
+	 $scope.deleting = [];
+	 var domainHash = '';
+	 var errorHash = '';
+
+	 $http.get('/api/v1.0/levels/').success(function(data) {
+	   $scope.errorLevels = data.levels;
+	   $scope.selectedLevels = $scope.errorLevels.slice();
+	 });
+
+	 function getDomains() {
+	   $http.get('/api/v1.0/domain/list/').success(function(data) {
+	     if(domainHash != data.hash) {
+	       domainHash = data.hash;
+	       $scope.domains = data.domains;
+	     }
+	   });
+	 }
+
+	 $scope.getErrors = function(host) {
+	   $scope.$storage.lastHost = host;
+	   if($scope.$storage.groupErrors) {
+	     url = '/api/v1.0/domain/' + host + '/errors/1/';
+	   } else {
+	     url = '/api/v1.0/domain/' + host + '/errors/0/';
+	   }
+	   $http.get(url).success(function(data) {
+	     if(errorHash != data.hash) {
+	       errorHash = data.hash
+	       $scope.errors = data.errors;
+	     }
+	   });
+	 }
+
+	 $scope.deleteError = function(id) {
+	   $scope.deleting[id] = true;
+	   if ($scope.$storage.groupErrors) {
+	     url = '/api/v1.0/delete/group/' + id + '/';
+	   } else {
+	     url = '/api/v1.0/delete/' + id + '/';
+	   }
+	   console.log(url);
+	   $http.get(url).success(function(data) {
+	     $scope.getErrors($scope.$storage.lastHost);
+	     getDomains();
+	     $scope.deleting[id] = false;
+	   });
+	 }
+
+	 function getAutoErrors() {
+	   if($scope.$storage.refreshErrors && $scope.$storage.lastHost != '') {
+	     $scope.getErrors($scope.$storage.lastHost);
+	   }
+	 }
+
+	 $scope.setLevel = function(level) {
+	   $scope.errorLevel = level;
+	   index = $scope.selectedLevels.indexOf(level);
+	   if(index != -1) {
+	     $scope.selectedLevels.splice(index, 1);
+	   } else {
+	     $scope.selectedLevels.push(level);
+	   }
+	   console.log($scope.selectedLevels);
+	 };
+
+	 $scope.setLevelAll = function() {
+	   if($scope.selectedLevels.length == $scope.errorLevels.length) {
+	     $scope.selectedLevels = [];
+	   } else {
+	     $scope.selectedLevels = $scope.errorLevels.slice();
+	   }
+	 }
+	 $scope.setLevelNone = function() {
+	   $scope.selectedLevels = [];
+	 }
+
+	 $scope.toggleErrorRefresh = function() {
+	   $scope.$storage.refreshErrors = !$scope.$storage.refreshErrors;
+	 }
+
+	 $scope.toggleGroupErrors = function() {
+	   $scope.$storage.groupErrors = !$scope.$storage.groupErrors;
+	   $scope.getErrors($scope.$storage.lastHost);
+	 }
+
+	 $scope.setSort = function(sort) {
+	   if($scope.$storage.sortBy == sort) {
+	     $scope.$storage.sortBy = '-' + sort;
+	   } else {
+	     $scope.$storage.sortBy = sort;
+	   }
+	 }
+
+	 getDomains();
+	 $scope.getErrors($scope.$storage.lastHost);
+	 setInterval(function() {getDomains();getAutoErrors();}, 5000);
+	 
+       });
+      </script>
+  </body>
+</html>
