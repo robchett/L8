@@ -230,7 +230,7 @@ CREATE TABLE `messages` (\n\
             self.id = id
             self.time = time
             self.count = count
-            self.context = context
+            self.context = json.loads(base64.b64decode(context))
             self.source = source
             self.level = level
             self.message = message
