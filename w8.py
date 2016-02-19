@@ -123,6 +123,27 @@ def error_levels():
     
     return jsonify({'levels': errors_obj.levels.keys})
 
+@app.route(base_path + 'delete/<int:id>/')
+@app.route(base_path + 'delete/group/<int:id>/', defaults={'group': True})
+def delete_error(id, group=False):
+    """
+    Deletes an error based on ID
+    """
+
+    errors_obj = Data(args)
+    try:
+        error = errors_obj.get_error(id)
+    except LookupError:
+        return jsonify({'success': False})
+
+    if group:
+        errors_obj.delete_type(error)
+    else:
+        errors_obj.delete_entry(error)
+
+    return jsonify({'success': True})
+
+
 @app.route('/')
 def template():
     return open('data/template.html').read(100000)
