@@ -12,15 +12,17 @@ from flask import Flask, jsonify, url_for
 
 app = Flask(__name__)
 
+
 def list_routes():
     import urllib
     output = {}
     for rule in app.url_map.iter_rules():
         doc = app.view_functions[rule.endpoint].__doc__
-        if rule.rule.startswith('/api/') and doc != None:
+        if rule.rule.startswith('/api/') and doc is not None:
             output[rule.rule] = doc.strip()
 
     return output
+
 
 def pretty_date(time=False):
     """
@@ -30,9 +32,9 @@ def pretty_date(time=False):
     """
     from datetime import datetime, timedelta
     now = datetime.now() - timedelta(hours=1)
-    if type(time) is int:
+    if isinstance(time, int):
         diff = now - datetime.fromtimestamp(time)
-    elif isinstance(time,datetime):
+    elif isinstance(time, datetime):
         diff = now - time
     elif not time:
         diff = now - now
@@ -67,6 +69,7 @@ def pretty_date(time=False):
 
 base_path = '/api/v1.0/'
 
+
 @app.route(base_path)
 def api():
     """
@@ -74,10 +77,11 @@ def api():
     """
 
     return jsonify({
-            'success' : True,
-            'version' : 1.0,
-            'methods' : list_routes(),
-            })
+        'success': True,
+        'version': 1.0,
+        'methods': list_routes(),
+    })
+
 
 @app.route(base_path + 'domain/list/')
 def domains():
@@ -91,7 +95,8 @@ def domains():
     for d in domains:
         json_domains.append(d.__dict__)
 
-    return jsonify({'domains':json_domains, 'hash': hashlib.md5(str(json_domains)).hexdigest()})
+    return jsonify({'domains': json_domains,
+                    'hash': hashlib.md5(str(json_domains)).hexdigest()})
 
 
 @app.route(base_path + 'domain/<string:host>/errors/')
@@ -111,7 +116,9 @@ def errors(host, mode=1):
         err_dict['ptime'] = pretty_date(err_dict['time'])
         json_errs.append(err_dict)
 
-    return jsonify({'errors':json_errs, 'hash': hashlib.md5(str(json_errs)).hexdigest()})
+    return jsonify({'errors': json_errs,
+                    'hash': hashlib.md5(str(json_errs)).hexdigest()})
+
 
 @app.route(base_path + 'levels/')
 def error_levels():
@@ -120,8 +127,9 @@ def error_levels():
     """
 
     errors_obj = Data(args)
-    
+
     return jsonify({'levels': errors_obj.levels.keys})
+
 
 @app.route(base_path + 'delete/<int:id>/')
 @app.route(base_path + 'delete/group/<int:id>/', defaults={'group': True})
