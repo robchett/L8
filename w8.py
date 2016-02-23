@@ -112,7 +112,6 @@ def errors(host, mode=1):
 
     for e in errs:
         err_dict = e.__dict__
-        #err_dict['timestamp'] = int(time.mktime(err_dict['time'].timetuple()))
         err_dict['ptime'] = pretty_date(err_dict['time'])
         json_errs.append(err_dict)
 
