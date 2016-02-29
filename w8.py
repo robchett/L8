@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+OB#!/usr/bin/env python
 
 import json
 import hashlib
@@ -31,7 +31,7 @@ def pretty_date(time=False):
     'just now', etc
     """
     from datetime import datetime, timedelta
-    now = datetime.now() - timedelta(hours=1)
+    now = datetime.now()
     if isinstance(time, int):
         diff = now - datetime.fromtimestamp(time)
     elif isinstance(time, datetime):
@@ -41,7 +41,7 @@ def pretty_date(time=False):
     second_diff = diff.seconds
     day_diff = diff.days
 
-    if day_diff < 0:
+    if second_diff < 0:
         return ''
 
     if day_diff == 0:
