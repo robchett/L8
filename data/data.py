@@ -230,7 +230,10 @@ CREATE TABLE `messages` (\n\
             self.id = id
             self.time = time
             self.count = count
-            self.context = json.loads(base64.b64decode(context))
+            try: 
+                self.context = json.loads(base64.b64decode(context))
+            except TypeError:
+                self.context = "Could not decode: " + context
             self.source = source
             self.level = level
             self.message = message
