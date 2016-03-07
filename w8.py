@@ -4,8 +4,8 @@ import json
 import hashlib
 
 import time
-import datetime
-
+from datetime import datetime
+from dateutil import relativedelta
 from data.data import Data
 from data.config import args
 from flask import Flask, jsonify, url_for
@@ -23,50 +23,28 @@ def list_routes():
 
     return output
 
+def _pretty_date_format(qty, quantifier):
+    return "%d %s%s ago" % (qty, quantifier, "s" if qty > 1 else "") 
 
-def pretty_date(time=False):
-    """
-    Get a datetime object or a int() Epoch timestamp and return a
-    pretty string like 'an hour ago', 'Yesterday', '3 months ago',
-    'just now', etc
-    """
-    from datetime import datetime, timedelta
-    now = datetime.now()# - timedelta(hours=1)
 
-    if isinstance(time, int):
-        diff = now - datetime.fromtimestamp(time)
-    elif isinstance(time, datetime):
-        diff = now - time
-    elif not time:
-        diff = now - now
-    second_diff = diff.seconds
-    day_diff = diff.days
+def pretty_date(obj_time=False):
+    dt1 = datetime.fromtimestamp(time.time()) # 1973-11-29 22:33:09
+    dt2 = datetime.fromtimestamp(obj_time) # 1977-06-07 23:44:50
+    rd = relativedelta.relativedelta (dt1, dt2)
 
-    if second_diff < 0:
-        return ''
-
-    if day_diff < 1:
-        if second_diff < 10:
-            return "just now"
-        if second_diff < 60:
-            return str(second_diff) + " seconds ago"
-        if second_diff < 120:
-            return "a minute ago"
-        if second_diff < 3600:
-            return str(second_diff / 60) + " minutes ago"
-        if second_diff < 7200:
-            return "an hour ago"
-        if second_diff < 86400:
-            return str(second_diff / 3600) + " hours ago"
-    if day_diff == 1:
-        return "Yesterday"
-    if day_diff < 7:
-        return str(day_diff) + " days ago"
-    if day_diff < 31:
-        return str(day_diff / 7) + " weeks ago"
-    if day_diff < 365:
-        return str(day_diff / 30) + " months ago"
-    return str(day_diff / 365) + " years ago"
+    if rd.years > 0:
+        return _pretty_date_format(rd.years, "year")
+    if rd.months > 0:    
+        return _pretty_date_format(rd.months, "month")   
+    if rd.days > 0:    
+        return _pretty_date_format(rd.days, "day")    
+    if rd.hours > 0:    
+        return _pretty_date_format(rd.hours, "hour")  
+    if rd.minutes > 0:    
+        return _pretty_date_format(rd.minutes, "minute")  
+    if rd.seconds > 0:    
+        return _pretty_date_format(rd.seconds, "second") 
+    return "just now"
 
 base_path = '/api/v1.0/'
 
@@ -114,10 +92,10 @@ def errors(host, mode=1):
     for e in errs:
         err_dict = e.__dict__
         err_dict['ptime'] = pretty_date(err_dict['time'])
+        err_dict['iso_time'] = datetime.fromtimestamp(err_dict['time']).isoformat()
         json_errs.append(err_dict)
 
-    return jsonify({'errors': json_errs,
-                    'hash': hashlib.md5(str(json_errs)).hexdigest()})
+    return jsonify({'errors': json_errs, 'hash': hashlib.md5(str(json_errs)).hexdigest()})
 
 
 @app.route(base_path + 'levels/')

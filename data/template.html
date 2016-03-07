@@ -111,7 +111,7 @@
 			</div>
 		      </td>
 		      <td class="p10">{{error.count}}</td>
-		      <td class="p10"><div class="one-line">{{error.ptime}}</div></td>
+		      <td class="p10"><time datetime="{{error.iso_time}}" class="one-line">{{error.ptime}}</time></td>
 		      <td><button href="#" ng-click="deleteError(error.id)" ng-class="{disabled: deleting[error.id] == true}" class="btn btn-default" type="button">Delete</button></td>
 		    </tr>
 		  </tbody>

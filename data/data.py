@@ -102,13 +102,13 @@ class Data:
     def errors(self, host, mode):
         with self.mysql.cursor() as cursor:
             if mode == self.mode.totals:
-                cursor.execute('SELECT filename, line, message, level, source, context, count(*) as count, MAX(time), id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} GROUP BY filename, line ORDER BY count DESC'.format(
+                cursor.execute('SELECT filename, line, message, level, source, context, count(*) as count, unix_timestamp(MAX(time)), id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} GROUP BY filename, line ORDER BY count DESC'.format(
                     host,
                     self.get_time_sql(),
                     self.get_level_sql())
                 )
             else:
-                cursor.execute('SELECT filename, line, message, level, source, context, 1 as count, time, id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} ORDER BY time DESC'.format(
+                cursor.execute('SELECT filename, line, message, level, source, context, 1 as count, unix_timestamp(time), id, domain FROM `messages` WHERE domain = "{0}" AND {1} AND {2} ORDER BY time DESC'.format(
                     host,
                     self.get_time_sql(),
                     self.get_level_sql())
