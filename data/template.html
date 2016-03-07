@@ -6,7 +6,11 @@
       <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.5/cerulean/bootstrap.min.css" rel="stylesheet">
       <style>
        button{outline: none !important;}
+       .one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+       .mono-font { font-family: 'Ubuntu Mono'; }
+       body { overflow-y: scroll; }
       </style>
+      <link href='https://fonts.googleapis.com/css?family=Ubuntu+Mono' rel='stylesheet' type='text/css'>
       <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/ngStorage/0.3.6/ngStorage.min.js">script></script>
       <title>W8</title>
@@ -68,20 +72,46 @@
 		    <tr>
 		      <th>Level</th>
 		      <th>Message</th>
-		      <th ng-click="setSort('count')">Count <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': $storage.sortBy == '-count', 'glyphicon-triangle-top': $storage.sortBy == 'count'}"></span></th>
-		      <th ng-click="setSort('time')">Time <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': $storage.sortBy == 'time', 'glyphicon-triangle-top': $storage.sortBy == '-time'}"></span></th>
+		      <th ng-click="setSort('count')" class="one-line">Count <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': $storage.sortBy == '-count', 'glyphicon-triangle-top': $storage.sortBy == 'count'}"></span></th>
+		      <th ng-click="setSort('time')" class="one-line">Time <span class="glyphicon" ng-class="{'glyphicon-triangle-bottom': $storage.sortBy == 'time', 'glyphicon-triangle-top': $storage.sortBy == '-time'}"></span></th>
 		      <th>&nbsp;</th>
 		    </tr>
 		  </thead>
 		  <tbody>
 		    <tr ng-repeat="error in errors | filter:searchText | inArray:selectedLevels:'level' | orderBy: $storage.sortBy"  ng-click="selectedError = error.id">
-		      <td class="p10">{{error.level}}</td>
+		      <td class="p10">{{ error.level }}</td>
 		      <td>
-			<pre>{{ error.message | limitTo : 125 : 0 }}</pre>
-			<pre>{{ error.file }} : {{ error.line }}</pre>
+			<div class="panel panel-default">
+			  <div class="panel-body">			
+			    <div class="row">
+			      <div class="col-sm-10">{{ error.message | limitTo : 125 : 0 }}</div>
+			      <div class="col-sm-2">
+				<button ng-click="toggleStackTrace(error.id)" class="btn btn-primary btn-xs" ng-class="{active: $storage.stackTrace == error.id}">Stack Trace</button>
+			      </div>
+			      <div class="col-sm-12">FILE: <span class="mono-font">{{ error.file }} : {{ error.line }}</span></div>
+			      <div class="col-sm-12 one-line">
+				<span class="mono-font">
+				  <a href="http://{{ $storage.lastHost }}{{ error.context.url }}" target="_blank">{{ error.context.url | limitTo : 125 : 0 || '/' }}</a>
+				</span>
+			      </div>
+			    </div>
+			  </div>
+			</div>
+			<div class="panel panel-default" ng-class="{hidden: $storage.stackTrace != error.id}">
+			  <div class="panel-heading">Stack Trace</div>
+			  <div class="panel-body">
+			    <div class="stack-trace" ng-repeat="trace in error.context.stack_trace">
+			      <div class="row" ng-repeat="(key, function) in trace.function">
+				<div class="col-md-8 mono-font">{{ trace.file }}</div>
+				<div class="col-md-3 mono-font">{{ function }}</div>
+				<div class="col-md-1 mono-font">{{ trace.line[key] }}</div>
+			      </div>
+			    </div>
+			  </div>
+			</div>
 		      </td>
 		      <td class="p10">{{error.count}}</td>
-		      <td class="p10">{{error.ptime}}</td>
+		      <td class="p10"><div class="one-line">{{error.ptime}}</div></td>
 		      <td><button href="#" ng-click="deleteError(error.id)" ng-class="{disabled: deleting[error.id] == true}" class="btn btn-default" type="button">Delete</button></td>
 		    </tr>
 		  </tbody>
@@ -123,7 +153,8 @@
            lastHost: '',
 	   sortBy: '-time',
            groupErrors: true,
-           refreshErrors: true
+           refreshErrors: true,
+	   stackTrace: 0,
          });
 	 $scope.domains = [];
 	 $scope.errors = [];
@@ -214,6 +245,14 @@
 	 $scope.toggleGroupErrors = function() {
 	   $scope.$storage.groupErrors = !$scope.$storage.groupErrors;
 	   $scope.getErrors($scope.$storage.lastHost);
+	 }
+
+	 $scope.toggleStackTrace = function(id) {
+	   if($scope.$storage.stackTrace == id) {
+	     $scope.$storage.stackTrace = 0;
+	   } else {
+	     $scope.$storage.stackTrace = id;
+	   }
 	 }
 
 	 $scope.setSort = function(sort) {
