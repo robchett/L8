@@ -52,7 +52,7 @@ class Processor:
 
     def work(self, data):
         host = data['domain']
-        if not host in self.domains:
+        if not host in self.domains and host is not None:
             self.domains[host] = Domain(host, self.config.get_host(host), self.redis)
         self.domains[host].add_error(data)
 
