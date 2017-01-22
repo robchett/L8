@@ -232,7 +232,7 @@ CREATE TABLE `messages` (\n\
             self.count = count
             try: 
                 self.context = json.loads(base64.b64decode(context))
-            except TypeError:
+            except (TypeError, ValueError) as e:
                 self.context = "Could not decode: " + context
             self.source = source
             self.level = level
