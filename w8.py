@@ -114,12 +114,7 @@ def errors(host, mode=1):
         err_dict['iso_time'] = datetime.fromtimestamp(err_dict['time']).isoformat()
         json_errs.append(err_dict)
 
-<<<<<<< HEAD
-    return jsonify({'errors': json_errs,
-                    'hash': hashlib.md5(str(json_errs)).hexdigest()})
-=======
     return jsonify({'errors': json_errs, 'hash': hashlib.md5(str(json_errs)).hexdigest()})
->>>>>>> upstream/master
 
 
 @app.route(base_path + 'levels/')
