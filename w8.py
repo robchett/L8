@@ -130,12 +130,15 @@ def errors(host, mode=1):
 
     for e in errs:
         err_dict = e.__dict__
+        for k,v in err_dict.items():
+            try:
+                json.dumps(v)
+            except (UnicodeDecodeError) as e:
+                err_dict[k] = None
         err_dict['ptime'] = pretty_date(err_dict['time'])
         err_dict['iso_time'] = datetime.fromtimestamp(err_dict['time']).isoformat()
         json_errs.append(err_dict)
-
-    return jsonify({'errors': json_errs, 'hash': hashlib.md5(str(json_errs)).hexdigest()})
-
+    return json.dumps({'errors': json_errs, 'hash': hashlib.md5(str(json_errs)).hexdigest()})
 
 #@cached(86400)
 @app.route(base_path + 'levels/')
