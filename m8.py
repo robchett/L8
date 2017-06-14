@@ -45,6 +45,7 @@ from data.error_levels import Levels
 class Processor:
     def __init__(self, domains, levels):
         self.domains = domains
+        self.levels = levels
 
     def watching(self, domain):
         if 'all' in self.domains or (domain is None and 'none' in self.domains):

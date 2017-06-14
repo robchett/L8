@@ -63,7 +63,7 @@ class Levels:
         return math.log(elevel, 2)
 
    def get_title(self, level):
-        return self.keys[self.get_level_value(level)]
+        return self.keys[int(self.get_level_value(level))]
 
    def is_enabled(self, level):
         return self.error_levels[self.get_level_value(level)]
