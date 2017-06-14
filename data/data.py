@@ -200,7 +200,7 @@ CREATE TABLE `messages` (\n\
                     record['message'],
                     record['filename'],
                     record['line'],
-                    record['context']
+                    json.dumps(record['context'])
                 )
                 cursor.execute(sql, parameters)
                 self.mysql.commit()
@@ -209,7 +209,7 @@ CREATE TABLE `messages` (\n\
                 self.connect()
                 self.work(item)
             else:
-                sys.stdout.write('%sMYSQL error: %s%s\n' % (bcolors.FAIL, err, bcolors.ENDC))
+                sys.stdout.write('%sMYSQL error: %s\n, context: %s%s\n' % (bcolors.FAIL, err, json.dumps(parameters), bcolors.ENDC))
             pass
         except TypeError as err:
             sys.stdout.write("%sFormat Error:%s%s\n" % (bcolors.FAIL, err, bcolors.ENDC))
@@ -220,20 +220,23 @@ CREATE TABLE `messages` (\n\
         latest = 2
 
     class Domain:
-        def __init__(self, host, error_count):
+        def __init__(self, host, error_count, **kwargs):
             self.host = host
             self.error_count = error_count
-            pass
+            self.counts = kwargs
 
     class Error:
         def __init__(self, id, file, line, message, level, source, context, count, time, domain):
             self.id = id
             self.time = time
             self.count = count
-            try: 
+            try:
                 self.context = json.loads(base64.b64decode(context))
             except (TypeError, ValueError) as e:
-                self.context = "Could not decode: " + context
+                try:
+                    self.context = json.loads(context)
+                except (TypeError, ValueError) as e2:
+                    self.context = str(e2) + " : " + context
             self.source = source
             self.level = level
             self.message = message
