@@ -52,7 +52,7 @@ class Processor:
 
     def work(self, data):
         host = data['domain']
-        if not host in self.domains and host is not None:
+        if host is not None and not host in self.domains:
             self.domains[host] = Domain(host, self.config.get_host(host), self.redis)
         self.domains[host].add_error(data)
 
@@ -102,12 +102,13 @@ class Domain:
         level = self.reverse_level(data['level'])
         self.incr_distribution(level)
 
-        self.incr_error_level(int(self.config['weighting_{}'.format(level)]))
-        if self.error_level > int(self.config['tolerance']):
+        value = int(self.config['weighting_{}'.format(level)])
+        self.incr_error_level(value)
+        if self.error_level >= int(self.config['tolerance']):
             self.alert()
             self.reset_error_level()
-        else:
-            print "%s: remaining tolerance - %d" % (self.host, int(self.config['tolerance']) - self.error_level)
+        elif value:
+            print "%s: remaining tolerance - %d (%d)" % (self.host, int(self.config['tolerance']) - self.error_level, value)
 
     def skip(self):
         self.skipped_posts += 1
