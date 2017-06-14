@@ -26,10 +26,29 @@ from datetime import datetime
 from dateutil import relativedelta
 from data.data import Data
 from data.config import args
-from flask import Flask, jsonify, url_for
+from flask import Flask, jsonify, url_for, request
+from werkzeug.contrib.cache import SimpleCache
+from functools import wraps
+
+CACHE_TIMEOUT = 300
+
+cache = SimpleCache()
+
+def cached(timeout=5 * 60, key='view/%s'):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            cache_key = key % request.path
+            rv = cache.get(cache_key)
+            if rv is not None:
+                return rv
+            rv = f(*args, **kwargs)
+            cache.set(cache_key, rv, timeout=timeout)
+            return rv
+        return decorated_function
+    return decorator
 
 app = Flask(__name__)
-
 
 def list_routes():
     import urllib
@@ -67,8 +86,8 @@ def pretty_date(obj_time=False):
 
 base_path = '/api/v1.0/'
 
-
 @app.route(base_path)
+@cached(86400)
 def api():
     """
     List the api calls
@@ -81,6 +100,7 @@ def api():
     })
 
 
+#@cached(60)
 @app.route(base_path + 'domain/list/')
 def domains():
     """
@@ -117,6 +137,7 @@ def errors(host, mode=1):
     return jsonify({'errors': json_errs, 'hash': hashlib.md5(str(json_errs)).hexdigest()})
 
 
+#@cached(86400)
 @app.route(base_path + 'levels/')
 def error_levels():
     """
@@ -149,6 +170,7 @@ def delete_error(id, group=False):
     return jsonify({'success': True})
 
 
+#@cached(86400)
 @app.route('/')
 def template():
     return open('data/template.html').read(100000)
