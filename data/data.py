@@ -36,7 +36,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 import datetime
 import json
-import math
 import redis
 import sys
 import time
@@ -44,6 +43,7 @@ import re
 import base64
 import argparse
 from bcolors import bcolors
+from error_levels import Levels
 import pymysql as mysql
 import pymysql.err as mysql_exceptions
 
@@ -53,16 +53,7 @@ class Data:
     def __init__(self, args):
         self.start_time = time.time() - (7 * 24 * 60 * 60)
         self.end_time = time.time() + (24 * 60 * 60)
-        self.error_levels = {
-            self.levels.DEBUG: args.eDEBUG,
-            self.levels.INFO: args.eINFO,
-            self.levels.NOTICE: args.eNOTICE,
-            self.levels.WARNING: args.eWARNING,
-            self.levels.ERROR: args.eERROR,
-            self.levels.CRITICAL: args.eCRITICAL,
-            self.levels.ALERT: args.eALERT,
-            self.levels.EMERGENCY: args.eEMERGENCY,
-        }
+        self.levels = Levels(args)
         try:
             self.mysql = mysql.connect(args.host, args.username, args.password, args.database)
         except (mysql_exceptions.OperationalError, mysql_exceptions.ProgrammingError) as err:
@@ -83,7 +74,7 @@ class Data:
         return 'DATE(time) >= "{0}" AND DATE(time) <= "{1}"'.format(self.format_timestamp(self.start_time), self.format_timestamp(self.end_time))
 
     def get_level_sql(self):
-        return 'level IN ("{0}")'.format('","'.join([self.levels.keys[i] for i in self.error_levels if self.error_levels[i]]))
+        return 'level IN ("{0}")'.format('","'.join([self.levels.keys[i] for i in self.levels.error_levels if self.levels.error_levels[i]]))
 
     def domains(self):
         with self.mysql.cursor() as cursor:
@@ -195,8 +186,10 @@ CREATE TABLE `messages` (\n\
                 sql = "INSERT into messages ( `domain` ,  `time` ,  `level` ,  `source` , `message` , `filename` , `line` , `context` ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
                 parameters = (
                     record['domain'],
-                    time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(record['time'])),
-                    math.log(record['level'], 2) + 1, record['source'],
+                    time.strftime('%Y-%m-%d %H:%M:%S',
+                    time.gmtime(record['time'])),
+                    self.levels.get_level_value(record['level']) + 1,
+                    record['source'],
                     record['message'],
                     record['filename'],
                     record['line'],
@@ -243,17 +236,6 @@ CREATE TABLE `messages` (\n\
             self.line = line
             self.file = file
             self.domain = domain
-
-    class levels:
-        keys = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY']
-        DEBUG = 0
-        INFO = 1
-        NOTICE = 2
-        WARNING = 3
-        ERROR = 4
-        CRITICAL = 5
-        ALERT = 6
-        EMERGENCY = 7
 
 class ConnectionError(Exception):
     pass

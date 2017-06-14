@@ -30,6 +30,7 @@ else:
     config.add_section('config')
 
 parser = argparse.ArgumentParser(description='Terminal viewer for L8 redis-backed logger.')
+parser.add_argument('-v', '--verbose',  default=False, action='store_true')
 parser.add_argument('-d', '--database', default=config.get('config', 'database'))
 parser.add_argument('-p', '--password', default=config.get('config', 'password'))
 parser.add_argument('-u', '--username', default=config.get('config', 'username'))

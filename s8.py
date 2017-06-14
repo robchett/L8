@@ -39,6 +39,7 @@ from data.config import args
 from data.data import Data
 from data.data import ConnectionError
 from data.subscriber import Subscriber
+import json
 
 
 class Processor:
@@ -48,12 +49,21 @@ class Processor:
 
     def work(self, entry):
         if self.watching(entry['domain']):
-            self.data.add_entry(entry)
+            if self.watching_severity(entry['level']):
+                 args.verbose and bcolors.print_colour("ADDING %s, %s\n" % (entry['level'], entry['domain']), bcolors.OKGREEN)
+                 self.data.add_entry(entry)
+            else:
+                args.verbose and bcolors.print_colour("Skipped entry level %s\n" % entry['level'], bcolors.FAIL)
+        else:
+            args.verbose and bcolors.print_colour("Skipped entry domain %s\n" % entry['domain'], bcolors.FAIL)
 
     def watching(self, domain):
         if 'all' in self.domains or (domain is None and 'none' in self.domains):
             return True
         return domain in [s.lower() for s in self.domains]
+
+    def watching_severity(self, level):
+        return level and self.data.levels.is_enabled(level)
 
 
 if __name__ == "__main__":
@@ -74,5 +84,5 @@ if __name__ == "__main__":
 """
 TODO
 ----
-Need to be able to filter for event severity and/or event contents
+Need to be able to filter event contents
 """

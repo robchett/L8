@@ -37,19 +37,13 @@ import datetime
 import math
 import redis
 import time
-import argparse
+from data.config import args
 from data.bcolors import bcolors
 from data.subscriber import Subscriber
-
-parser = argparse.ArgumentParser(description='Static (mysql) log for the L8 redis-backed logger.')
-parser.add_argument('-s', '--subscription', default='L8')
-parser.add_argument('--domains', default='all', help='Domains to filter out, defaults to "all"')
-args = parser.parse_args()
-
+from data.error_levels import Levels
 
 class Processor:
-    def __init__(self, domains):
-        self.map = ['DEBUG', 'INFO', 'NOTICE', 'WARNING', 'ERROR', 'CRITICAL', 'ALERT', 'EMERGENCY']
+    def __init__(self, domains, levels):
         self.domains = domains
 
     def watching(self, domain):
@@ -57,14 +51,17 @@ class Processor:
             return True
         return domain in [s.lower() for s in self.domains]
 
+    def watching_severity(self, level):
+        return level and self.levels.is_enabled(level)
+
     def work(self, record):
-        if self.watching(record['domain']):
+        if self.watching(record['domain']) and self.watching_severity(record['level']):
             bcolors.print_colour(datetime.datetime.fromtimestamp(record['time']).strftime('[%Y-%m-%d %H:%M:%S]'), bcolors.OKBLUE)
 
             if record['domain'] is not None:
                 bcolors.print_colour(' <' + record['domain'] + '> ', bcolors.OKGREEN)
 
-            bcolors.print_colour(' %s "%s"' % (self.map[int(math.log(record['level'], 2))], record['message']), bcolors.WARNING)
+            bcolors.print_colour(' %s "%s"' % (self.levels.get_title(record['level']), record['message']), bcolors.WARNING)
 
             if len(record['filename']):
                 bcolors.print_colour(" in ", bcolors.ENDC)
@@ -82,8 +79,9 @@ if __name__ == "__main__":
     bcolors.print_colour("Press Ctrl-C to exit\n", bcolors.OKGREEN, )
 
     try:
+        l = Levels(args)
         s = Subscriber(args.subscription)
-        c = Processor([d.lower() for d in domains])
+        c = Processor([d.lower() for d in domains], l)
         s.work(c.work)
     except redis.ConnectionError as err:
         sys.stdout.write('%s%sConnection error%s\n' % (bcolors.UNDERLINE, bcolors.FAIL, bcolors.ENDC))
