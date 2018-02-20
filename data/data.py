@@ -193,7 +193,7 @@ CREATE TABLE `messages` (\n\
                     record['message'],
                     record['filename'],
                     record['line'],
-                    json.dumps(record['context'])
+                    record['context'] if type(record['context']) is str else json.dumps(record['context'])
                 )
                 cursor.execute(sql, parameters)
                 self.mysql.commit()
